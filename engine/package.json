@@ -2,6 +2,7 @@
   "name": "agent-loop-engine",
   "version": "0.1.0",
   "description": "Cross-agent six-phase development loop engine (MCP server). Externalizes working memory to disk and serves phase playbooks just-in-time to cut token usage.",
+  "license": "MIT",
   "type": "module",
   "bin": {
     "agent-loop-engine": "dist/index.js"
