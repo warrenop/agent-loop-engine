@@ -4,6 +4,16 @@
 
 可装进 **Cursor / Claude Code / 通用 AGENTS.md / Windsurf / Cline**。
 
+## 快速安装(npm)
+
+发布后,在任意项目根一行装好(免克隆 / 构建 / 改路径):
+
+```bash
+npx -y agent-loop-engine init cursor --project .   # 或 claude-code / windsurf-cline / agents-md
+```
+
+详见 [docs/USAGE.md](docs/USAGE.md)。
+
 ## 它解决什么(来自实测,详见 [docs/ANALYSIS.md](docs/ANALYSIS.md))
 
 - 探索类调用(Read/Grep/Glob/语义)占全部工具调用 **50–82%**,且结果永久驻留对话。

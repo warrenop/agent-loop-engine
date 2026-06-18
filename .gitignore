@@ -1,5 +1,6 @@
 node_modules/
 dist/
+engine/assets/
 .agent-loop/
 *.log
 .DS_Store

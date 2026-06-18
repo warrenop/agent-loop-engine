@@ -28,7 +28,11 @@ const DEFAULT_PROFILE: Profile = {
 };
 
 const here = path.dirname(fileURLToPath(import.meta.url)); // engine/dist
-const packagedProfilesDir = path.resolve(here, "..", "..", "profiles");
+// 包内优先(npm 安装态 & 源码态都有 engine/profiles),仓库根回退(源码态:供集成测试读 dev_warren_agent)
+const packagedProfilesDirs = [
+  path.resolve(here, "..", "profiles"),
+  path.resolve(here, "..", "..", "profiles"),
+];
 
 async function readJson(p: string): Promise<Profile | null> {
   try {
@@ -44,7 +48,7 @@ export async function loadProfile(name: string | null | undefined): Promise<Prof
   if (!name) return DEFAULT_PROFILE;
   const candidates = [
     path.join(projectRoot(), ".agent-loop", "profiles", `${name}.json`),
-    path.join(packagedProfilesDir, `${name}.json`),
+    ...packagedProfilesDirs.map((d) => path.join(d, `${name}.json`)),
   ];
   for (const c of candidates) {
     const p = await readJson(c);
