@@ -1,5 +1,33 @@
 # 使用说明
 
+## 一键安装(npm,推荐)
+
+引擎发布到 npm 后(`cd engine && npm publish --access public`),在**任意机器、任意项目根**一行装好——无需克隆、无需构建、无需改绝对路径:
+
+```bash
+# 在你的项目根目录执行,选对应的 Agent
+npx -y agent-loop-engine init cursor          --project .
+npx -y agent-loop-engine init claude-code     --project .
+npx -y agent-loop-engine init windsurf-cline  --project .
+npx -y agent-loop-engine init agents-md       --project .
+```
+
+`init` 会:写入该 Agent 的规则/命令文件、把 `agent-loop` 以 **npx 形态**合并进 mcp 配置(免绝对路径)、落地协议到 `protocol/`、按需设置 profile。装完重载 Agent 即可用 `/loop`。
+
+带上你的定制 profile(落到项目级 `.agent-loop/profiles/`,**不进公开包**):
+
+```bash
+npx -y agent-loop-engine init cursor --project . --profile-file ./dev_warren_agent.json
+```
+
+> - 不传 profile 用包内 `default`;`--profile <名>` 需你自备 `.agent-loop/profiles/<名>.json`。
+> - Windsurf / Cline 的 MCP 配置在**全局**(没有项目级 mcp.json),`init` 会写规则文件并**打印需手动粘贴的 server 块**与位置。
+> - 重复 `init` 幂等:mcp 合并保留你其它 server,CLAUDE.md/AGENTS.md 不重复追加。
+
+下面是**从源码手动安装**(开发 / 离线 / 尚未发布)的方式。
+
+---
+
 ## 0. 一次性准备:构建引擎
 
 ```bash

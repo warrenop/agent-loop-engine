@@ -10,14 +10,20 @@
   "main": "dist/index.js",
   "files": [
     "dist",
-    "../profiles"
+    "!dist/smoke.js",
+    "profiles",
+    "assets"
   ],
   "scripts": {
     "build": "tsc",
+    "build:assets": "node scripts/build-assets.mjs",
     "start": "node dist/index.js",
     "smoke": "node dist/smoke.js",
     "test:integration": "node test/integration.mjs",
-    "test": "npm run build && npm run smoke && npm run test:integration"
+    "test:init": "node test/init.e2e.mjs",
+    "test": "npm run build && npm run build:assets && npm run smoke && npm run test:integration && npm run test:init",
+    "prepare": "npm run build && npm run build:assets",
+    "prepublishOnly": "npm run build && npm run build:assets"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.0",

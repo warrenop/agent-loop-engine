@@ -1,0 +1,6 @@
+{
+  "name": "default",
+  "budgets": { "read": 15, "grep": 20, "glob": 8, "semanticSearch": 6, "fetch": 2 },
+  "intake": "需求若来自原型/PRD 链接,先抓一次提炼成任务简报;主动确认是否还有其它端有同逻辑。",
+  "conventions": "改动外科手术式、最小化;优先复用已有工具/方法,在 INVESTIGATE 记到 context-map。"
+}

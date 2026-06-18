@@ -20,6 +20,7 @@ import {
 } from "./state.js";
 import { DEFAULT_BUDGETS } from "./profile.js";
 import { buildResumeText } from "./resume.js";
+import { parseArgs, mergeMcpServers, appendSnippetIdempotent, resolveProfileEnv } from "./cli.js";
 
 let pass = 0;
 let fail = 0;
@@ -178,6 +179,33 @@ check("buildResume:阶段达标但 plan 未写入→标注(空)", resumeEmptyPla
 check("IMPLEMENT playbook 已去除「新开 session」", !PHASES.IMPLEMENT.playbook.includes("新开"));
 check("IMPLEMENT playbook 指向 loop_resume 续跑", PHASES.IMPLEMENT.playbook.includes("loop_resume"));
 check("IMPLEMENT reminder 已去除「新开 session」", !PHASES.IMPLEMENT.reminder.includes("新开"));
+
+// ===== init CLI 纯函数 =====
+const pa = parseArgs(["cursor", "--project", "/x", "--profile", "p"]);
+check("parseArgs 解析 agent/project/profile", pa.agent === "cursor" && pa.project === "/x" && pa.profile === "p");
+let paThrew = false;
+try { parseArgs(["cursor"]); } catch { paThrew = true; }
+check("parseArgs 缺 --project 抛错", paThrew);
+
+const m1 = mergeMcpServers(null, { command: "npx", args: ["-y", "agent-loop-engine"], env: {} });
+check("mergeMcpServers(null) 产出 npx 块", m1.includes("agent-loop") && m1.includes("npx"));
+const m2 = mergeMcpServers('{"mcpServers":{"other":{"command":"x"}}}', { command: "npx", args: [], env: {} });
+const m2obj = JSON.parse(m2);
+check("mergeMcpServers 保留已有 other server", !!m2obj.mcpServers.other && !!m2obj.mcpServers["agent-loop"]);
+const m3obj = JSON.parse(mergeMcpServers(m2, { command: "npx", args: [], env: {} }));
+check("mergeMcpServers 幂等(仍只有 other+agent-loop 两个键)", Object.keys(m3obj.mcpServers).length === 2);
+
+const snipA = appendSnippetIdempotent(null, "BODY", "agent-loop");
+check("appendSnippet 空输入→changed 且含 marker", snipA.changed && snipA.text.includes("<!-- agent-loop:begin -->") && snipA.text.includes("BODY"));
+const snipB = appendSnippetIdempotent(snipA.text, "BODY", "agent-loop");
+check("appendSnippet 幂等→不重复追加", !snipB.changed && snipB.text === snipA.text);
+
+const r1 = resolveProfileEnv({ project: "/p" });
+check("resolveProfileEnv 默认 default", r1.envName === "default" && !r1.copyFile);
+const r2 = resolveProfileEnv({ project: "/p", profile: "myprof" });
+check("resolveProfileEnv --profile 设 env 不拷文件", r2.envName === "myprof" && !r2.copyFile);
+const r3 = resolveProfileEnv({ project: "/p", profileFile: "/some/dev_warren_agent.json" });
+check("resolveProfileEnv --profile-file 拷到项目 .agent-loop/profiles", r3.envName === "dev_warren_agent" && !!r3.copyFile && r3.copyFile.to.includes(".agent-loop/profiles/dev_warren_agent.json"));
 
 console.log(`\n结果:${pass} 通过 / ${fail} 失败`);
 await fs.rm(tmp, { recursive: true, force: true });
