@@ -1,0 +1,18 @@
+---
+description: Agent Loop 开发循环(常驻指针,指向 agent-loop-engine MCP)
+globs:
+alwaysApply: true
+---
+
+# Agent Loop(开发循环)
+
+本项目使用「Agent Loop」标准开发循环。对**任何非平凡开发任务**(需求实现 / bug 修复 / 重构):
+
+1. **先 `loop_start`**(MCP 工具)开始,严格按引擎返回的各阶段 playbook 执行。
+2. 顺序走六阶段 `INTAKE→CLARIFY→INVESTIGATE→PLAN→IMPLEMENT→VERIFY`,用 `loop_advance` 推进;**闸门未过不强行跳阶段**。
+3. 把需求/澄清/调研/计划/进度用 `loop_record` 写进 `.agent-loop/<任务>/`,**不要在对话里堆大段内容**。
+4. **INVESTIGATE**:先 Grep/Glob 定位、再按行范围精读、**同一文件不重读**;每次搜索后 `loop_budget` 报量,超预算即收尾。
+5. **计划获批后**(`loop_advance to:'IMPLEMENT'` 带 `evidence:'user-approved'`)再实现;在干净上下文续跑:`/clear` 后运行 `/loop`(无参)→ `loop_resume` 一次性内联 plan + context-map。
+6. 引擎不可用时,改读 `protocol/agent-loop-protocol.md` 自律执行。
+
+平凡改动(改文案 / 单行)可跳过本循环。

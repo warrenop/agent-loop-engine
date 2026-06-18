@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "agent-loop": {
+      "command": "node",
+      "args": ["/Users/warrenmini/workspace/Agent_Loop_Enhancement/engine/dist/index.js"],
+      "env": {
+        "AGENT_LOOP_PROFILE": "dev_warren_agent"
+      }
+    }
+  }
+}
