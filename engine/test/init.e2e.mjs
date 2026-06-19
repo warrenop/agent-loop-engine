@@ -37,7 +37,7 @@ const rm = (p) => fs.rmSync(p, { recursive: true, force: true });
     has(path.join(proj, ".cursor/rules/agent-loop.mdc")) && has(path.join(proj, ".cursor/commands/loop.md"))
   );
   const s = JSON.parse(read(path.join(proj, ".cursor/mcp.json"))).mcpServers["agent-loop"];
-  ok("cursor: mcp.json 为 npx 形态", s.command === "npx" && s.args.includes("agent-loop-engine"));
+  ok("cursor: mcp.json 为本机 node 入口形态", s.command === "node" && s.args[0].endsWith("dist/index.js"));
   ok("cursor: 默认 profile=default", s.env.AGENT_LOOP_PROFILE === "default");
   rm(proj);
 }
@@ -50,8 +50,8 @@ const rm = (p) => fs.rmSync(p, { recursive: true, force: true });
   ok("claude-code: CLAUDE.md 含 agent-loop 段", c1.includes("<!-- agent-loop:begin -->"));
   ok("claude-code: 写出 .claude/commands/loop.md", has(path.join(proj, ".claude/commands/loop.md")));
   ok(
-    "claude-code: 写出 .mcp.json(npx)",
-    JSON.parse(read(path.join(proj, ".mcp.json"))).mcpServers["agent-loop"].command === "npx"
+    "claude-code: 写出 .mcp.json(node 入口)",
+    JSON.parse(read(path.join(proj, ".mcp.json"))).mcpServers["agent-loop"].command === "node"
   );
   init(["claude-code", "--project", proj]); // 二次
   const c2 = read(path.join(proj, "CLAUDE.md"));
@@ -92,7 +92,7 @@ const rm = (p) => fs.rmSync(p, { recursive: true, force: true });
     has(path.join(proj, ".clinerules/agent-loop.md")) && has(path.join(proj, ".windsurf/rules/agent-loop.md"))
   );
   ok("windsurf-cline: 不写项目 mcp.json", !has(path.join(proj, ".cursor/mcp.json")) && !has(path.join(proj, ".mcp.json")));
-  ok("windsurf-cline: 打印全局注册指引(含 npx)", out.includes("全局") && out.includes("npx"));
+  ok("windsurf-cline: 打印全局注册指引(含 node 入口)", out.includes("全局") && out.includes("dist/index.js"));
   rm(proj);
 }
 

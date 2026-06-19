@@ -4,15 +4,16 @@
 
 可装进 **Cursor / Claude Code / 通用 AGENTS.md / Windsurf / Cline**。
 
-## 快速安装(npm)
+## 快速安装(无需 npm 账号)
 
-发布后,在任意项目根一行装好(免克隆 / 构建 / 改路径):
+每台机器克隆一次并装依赖(`npm install` 自动构建),再到目标项目根一行装好:
 
 ```bash
-npx -y agent-loop-engine init cursor --project .   # 或 claude-code / windsurf-cline / agents-md
+git clone https://github.com/warrenop/agent-loop-engine.git && cd agent-loop-engine/engine && npm install
+node "$(pwd)/dist/index.js" init cursor --project /路径/到/你的项目   # 或 claude-code / windsurf-cline / agents-md
 ```
 
-详见 [docs/USAGE.md](docs/USAGE.md)。
+`init` 会写入规则/命令、把本机 node 入口写进 mcp 配置(路径自动填对)、落地协议。详见 [docs/USAGE.md](docs/USAGE.md)。
 
 ## 它解决什么(来自实测,详见 [docs/ANALYSIS.md](docs/ANALYSIS.md))
 
