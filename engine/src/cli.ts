@@ -133,9 +133,10 @@ const AGENTS: Record<string, AgentSpec> = {
 
 const here = path.dirname(fileURLToPath(import.meta.url)); // engine/dist
 const assetsRoot = path.resolve(here, "..", "assets", "agents");
+const engineEntry = path.resolve(here, "index.js"); // 本机引擎入口绝对路径(随克隆位置自动正确)
 
 function serverBlock(envName: string): Record<string, unknown> {
-  return { command: "npx", args: ["-y", "agent-loop-engine"], env: { AGENT_LOOP_PROFILE: envName } };
+  return { command: "node", args: [engineEntry], env: { AGENT_LOOP_PROFILE: envName } };
 }
 
 /** 执行一次安装:拷文件 + 合并 mcp + 幂等追加 snippet + 处理 profile。stdout 打印进度。 */
