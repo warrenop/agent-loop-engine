@@ -43,13 +43,15 @@ docs/USAGE.md                     安装与日常使用说明
 docs/ANALYSIS.md                  优化分析(证据)
 ```
 
-## 选哪个适配器
+## 各 Agent 支持情况
 
-| 你用的 Agent | 用 |
-|---|---|
-| Cursor | `adapters/cursor/`(.cursor/rules + commands + mcp.json) |
-| Claude Code | `adapters/claude-code/`(CLAUDE.snippet + .claude/commands + .mcp.json) |
-| 其它(通用) | `adapters/agents-md/AGENTS.snippet.md` |
-| Windsurf / Cline | `adapters/windsurf-cline/` |
+引擎(六阶段 / 闸门 / 预算 / `loop_resume`)对所有 Agent 通用,差异只在「怎么触发」。装法统一:`init <agent>`(见下)。
 
-安装与用法见 **[docs/USAGE.md](docs/USAGE.md)**。
+| Agent | `/loop` 命令 | 批准后续跑 | MCP 配置 |
+|---|---|---|---|
+| Cursor | ✅ | `/clear` + `/loop` 无参 | 项目 `.cursor/mcp.json` |
+| Claude Code | ✅ | **自动派 subagent**(无需 /clear) | 项目 `.mcp.json` |
+| Windsurf / Cline | ❌(常驻规则) | 新对话调 `loop_resume` | **全局**(手动) |
+| 通用 AGENTS.md | ❌(常驻规则) | 新对话调 `loop_resume` | 由所在客户端 |
+
+完整差异表、安装与用法见 **[docs/USAGE.md](docs/USAGE.md)**。
