@@ -1,5 +1,24 @@
 # 使用说明
 
+## 各 Agent 能力差异(先看这个)
+
+引擎(六阶段 + 闸门 + 预算 + 工具 `loop_start/status/record/budget/advance/resume`)对所有 Agent **通用**;差异只在「怎么触发」:
+
+| 能力 | Cursor | Claude Code | Windsurf / Cline | 通用 AGENTS.md |
+|---|---|---|---|---|
+| 六阶段 + 闸门 + 预算 | ✅ | ✅ | ✅ | ✅ |
+| `loop_resume` 续跑 | ✅ | ✅ | ✅ | ✅ |
+| `/loop` 斜杠命令 | ✅ | ✅ | ❌ | ❌ |
+| 常驻指针 | `.cursor/rules` | `CLAUDE.md` 段 | `.clinerules` / `.windsurf/rules` | `AGENTS.md` 段 |
+| 批准后续跑方式 | `/clear` 再 `/loop` 无参 | **自动派 subagent**(无需 /clear) | 新对话里调 `loop_resume` | 新对话里调 `loop_resume` |
+| MCP 注册位置 | 项目 `.cursor/mcp.json` | 项目 `.mcp.json` | **全局**(手动配) | 由所在客户端 |
+
+> **无斜杠命令的 Agent(Windsurf / Cline / 通用 AGENTS.md)** 用法不同:没有 `/loop`,靠常驻规则自律走六阶段;**续跑** = 在新对话 / 清空上下文后让它**直接调 MCP 工具 `loop_resume`**;**MCP** 需按客户端要求**手动注册到全局**(`init` 会写好规则文件并打印待粘贴的 server 块与位置)。
+>
+> Cursor 与 Claude Code 可**同时**装在同一项目(各读各的适配器,共用同一引擎与 `.agent-loop/` 数据)。
+
+---
+
 ## 一键安装(克隆 + init,无需 npm 账号)
 
 每台机器**克隆一次**本仓库并装依赖(`npm install` 的 `prepare` 钩子会自动构建,无需手动 `build`):
