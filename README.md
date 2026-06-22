@@ -13,7 +13,7 @@ git clone https://github.com/warrenop/agent-loop-engine.git && cd agent-loop-eng
 node "$(pwd)/dist/index.js" init cursor --project /路径/到/你的项目   # 或 claude-code / windsurf-cline / agents-md
 ```
 
-`init` 会写入规则/命令、把本机 node 入口写进 mcp 配置(路径自动填对)、落地协议。卸载同样一行:`node <ALE>/engine/dist/index.js uninstall cursor --project .`(精准移除,保留你的 `.agent-loop/` 数据)。详见 [docs/USAGE.md](docs/USAGE.md)。
+`init` 会写入规则/命令、把本机 node 入口写进 mcp 配置(路径自动填对)、**装探索预算 hook**(host 自动计数)、落地协议。卸载同样一行:`node <ALE>/engine/dist/index.js uninstall cursor --project .`(精准移除,保留你的 `.agent-loop/` 数据)。详见 [docs/USAGE.md](docs/USAGE.md)。
 
 ## 它解决什么(来自实测,详见 [docs/ANALYSIS.md](docs/ANALYSIS.md))
 
@@ -53,5 +53,7 @@ docs/ANALYSIS.md                  优化分析(证据)
 | Claude Code | ✅ | **自动派 subagent**(无需 /clear) | 项目 `.mcp.json` |
 | Windsurf / Cline | ❌(常驻规则) | 新对话调 `loop_resume` | **全局**(手动) |
 | 通用 AGENTS.md | ❌(常驻规则) | 新对话调 `loop_resume` | 由所在客户端 |
+
+> **探索预算自动计数(host hook,`init` 自动装)**:Claude Code 全自动(Read/Grep/Glob,`PreToolUse`)、Cursor 仅文件读取(`beforeReadFile`;原生搜索无 hook)、其余手动 `loop_budget`。默认 `warn`,可 `AGENT_LOOP_BUDGET_ENFORCE=block` 改硬拦。详见 USAGE 第 4 节。
 
 完整差异表、安装与用法见 **[docs/USAGE.md](docs/USAGE.md)**。

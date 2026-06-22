@@ -55,7 +55,7 @@ export const PHASES: Record<Phase, PhaseDef> = {
       "- 先用 Grep/Glob/语义搜索**定位**,再按**行范围**精读,不要整文件读。",
       "- 同一文件**只读一次**:读完立刻把关键签名/调用链/行号写进 context-map;之后查 context-map,不重读。",
       "- 相关搜索**合并**,独立调用在同一回合**并行**发起。",
-      "- 每次搜索/读取后调 `loop_budget`(如 `loop_budget grep 1`)上报用量。",
+      "- 用量计数:装了预算 hook 的客户端会**自动计数**(Claude Code 连搜索都自动,Cursor 仅文件读取);**没装或客户端数不到的搜索**(如 Cursor 原生 grep)再手动 `loop_budget grep 1` 补报。",
       "",
       "context-map 至少包含:涉及文件 `path:line`、关键函数签名、调用链、**可复用的现有工具/方法**、一个「改动点覆盖清单」。",
       "",

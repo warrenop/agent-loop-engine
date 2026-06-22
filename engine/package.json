@@ -21,7 +21,8 @@
     "smoke": "node dist/smoke.js",
     "test:integration": "node test/integration.mjs",
     "test:init": "node test/init.e2e.mjs",
-    "test": "npm run build && npm run build:assets && npm run smoke && npm run test:integration && npm run test:init",
+    "test:hook": "node test/hook.e2e.mjs",
+    "test": "npm run build && npm run build:assets && npm run smoke && npm run test:integration && npm run test:init && npm run test:hook",
     "prepare": "npm run build && npm run build:assets",
     "prepublishOnly": "npm run build && npm run build:assets"
   },
