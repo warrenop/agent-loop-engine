@@ -13,7 +13,7 @@ git clone https://github.com/warrenop/agent-loop-engine.git && cd agent-loop-eng
 node "$(pwd)/dist/index.js" init cursor --project /路径/到/你的项目   # 或 claude-code / windsurf-cline / agents-md
 ```
 
-`init` 会写入规则/命令、把本机 node 入口写进 mcp 配置(路径自动填对)、落地协议。详见 [docs/USAGE.md](docs/USAGE.md)。
+`init` 会写入规则/命令、把本机 node 入口写进 mcp 配置(路径自动填对)、落地协议。卸载同样一行:`node <ALE>/engine/dist/index.js uninstall cursor --project .`(精准移除,保留你的 `.agent-loop/` 数据)。详见 [docs/USAGE.md](docs/USAGE.md)。
 
 ## 它解决什么(来自实测,详见 [docs/ANALYSIS.md](docs/ANALYSIS.md))
 

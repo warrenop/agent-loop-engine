@@ -86,6 +86,43 @@ export function resolveProfileEnv(opts: {
   return { envName: "default" };
 }
 
+/** 移除 appendSnippetIdempotent 写入的 marker 包裹块,保留其余内容。 */
+export function removeSnippet(existing: string | null, marker: string): { text: string; changed: boolean } {
+  if (!existing) return { text: "", changed: false };
+  const begin = `<!-- ${marker}:begin -->`;
+  const end = `<!-- ${marker}:end -->`;
+  const i = existing.indexOf(begin);
+  if (i === -1) return { text: existing, changed: false };
+  const j = existing.indexOf(end, i);
+  if (j === -1) return { text: existing, changed: false };
+  const before = existing.slice(0, i).replace(/\s+$/, "");
+  const after = existing.slice(j + end.length).replace(/^\s+/, "");
+  let text = [before, after].filter(Boolean).join("\n\n");
+  if (text.length) text += "\n";
+  return { text, changed: true };
+}
+
+/** 从 mcp 配置文本中删除某个 server。empty 表示删后 mcpServers 已空。 */
+export function removeMcpServer(
+  existing: string | null,
+  name: string
+): { text: string; changed: boolean; empty: boolean } {
+  if (!existing || !existing.trim()) return { text: existing ?? "", changed: false, empty: false };
+  let obj: Record<string, any>;
+  try {
+    obj = JSON.parse(existing);
+  } catch {
+    return { text: existing, changed: false, empty: false };
+  }
+  const servers = obj && obj.mcpServers;
+  if (!servers || typeof servers !== "object" || !(name in servers)) {
+    return { text: existing, changed: false, empty: !!servers && Object.keys(servers).length === 0 };
+  }
+  delete servers[name];
+  const empty = Object.keys(servers).length === 0;
+  return { text: JSON.stringify(obj, null, 2) + "\n", changed: true, empty };
+}
+
 // ===== 表驱动:四类 agent 的「源→目标」映射 =====
 interface FileCopy {
   from: string; // 相对 assetsRoot
@@ -187,7 +224,7 @@ export async function runInit(args: string[]): Promise<void> {
     const merged = mergeMcpServers(existing, serverBlock(prof.envName));
     await fs.mkdir(path.dirname(dst), { recursive: true });
     await fs.writeFile(dst, merged, "utf8");
-    log(`  ✓ 合并 mcp 配置 → ${spec.mcpTarget}(npx 形态)`);
+    log(`  ✓ 合并 mcp 配置 → ${spec.mcpTarget}(本机 node 入口)`);
   }
 
   if (prof.copyFile) {
@@ -216,5 +253,68 @@ export async function runInit(args: string[]): Promise<void> {
   }
 
   log("\n✅ 完成。重载 Agent 后:新任务用 /loop,续跑用 /loop(无参)或直接调 loop_resume。");
+}
+
+/** 撤销一次安装:删拷贝的文件、从 mcp 配置摘掉 agent-loop、去掉 snippet 块。不动 .agent-loop/ 与 protocol/。 */
+export async function runUninstall(args: string[]): Promise<void> {
+  const opts = parseArgs(args);
+  const spec = AGENTS[opts.agent];
+  if (!spec) throw new Error(`未知 agent "${opts.agent}"。可选:${AGENT_KEYS.join(", ")}`);
+  if (!existsSync(opts.project)) throw new Error(`--project 目录不存在:${opts.project}`);
+
+  const log = (m: string) => console.log(m);
+  log(`▶ 卸载 Agent Loop ← ${spec.label} · 项目 ${opts.project}`);
+
+  for (const f of spec.files) {
+    const dst = path.join(opts.project, f.to);
+    if (existsSync(dst)) {
+      await fs.rm(dst);
+      log(`  ✓ 删除 ${f.to}`);
+    } else {
+      log(`  • ${f.to} 不存在,跳过`);
+    }
+  }
+
+  for (const s of spec.snippets) {
+    const dst = path.join(opts.project, s.to);
+    if (!existsSync(dst)) {
+      log(`  • ${s.to} 不存在,跳过`);
+      continue;
+    }
+    const { text, changed } = removeSnippet(await fs.readFile(dst, "utf8"), "agent-loop");
+    if (!changed) {
+      log(`  • ${s.to} 无 agent-loop 段,跳过`);
+    } else if (text.trim() === "") {
+      await fs.rm(dst);
+      log(`  ✓ 移除 ${s.to} 的 agent-loop 段(文件已空 → 删除)`);
+    } else {
+      await fs.writeFile(dst, text, "utf8");
+      log(`  ✓ 移除 ${s.to} 的 agent-loop 段(保留其余内容)`);
+    }
+  }
+
+  if (spec.mcpTarget) {
+    const dst = path.join(opts.project, spec.mcpTarget);
+    if (!existsSync(dst)) {
+      log(`  • ${spec.mcpTarget} 不存在,跳过`);
+    } else {
+      const { text, changed, empty } = removeMcpServer(await fs.readFile(dst, "utf8"), "agent-loop");
+      if (!changed) {
+        log(`  • ${spec.mcpTarget} 无 agent-loop,跳过`);
+      } else if (empty && text.replace(/\s/g, "") === '{"mcpServers":{}}') {
+        await fs.rm(dst);
+        log(`  ✓ 从 ${spec.mcpTarget} 移除 agent-loop(已空 → 删除文件)`);
+      } else {
+        await fs.writeFile(dst, text, "utf8");
+        log(`  ✓ 从 ${spec.mcpTarget} 移除 agent-loop(保留其它 server)`);
+      }
+    }
+  }
+
+  if (spec.globalMcpNote) {
+    log("\n⚠️ Windsurf / Cline:请手动从全局 mcp 配置移除 `agent-loop` 这一项。");
+  }
+  log("\n注:`.agent-loop/`(循环工作记忆/产物)与 `protocol/agent-loop-protocol.md` 已保留;如需清理请手动删。");
+  log("✅ 卸载完成。");
 }
 

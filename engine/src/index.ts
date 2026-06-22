@@ -20,12 +20,12 @@ import { checkTransition, PHASES, phaseIndex } from "./phases.js";
 import { loadProfile, Profile } from "./profile.js";
 import { buildResumeText } from "./resume.js";
 
-// argv 分流:`init` 子命令走 CLI(允许 stdout 打印),在进入 MCP server 之前返回。
+// argv 分流:`init` / `uninstall` 子命令走 CLI(允许 stdout 打印),在进入 MCP server 之前返回。
 const __argv = process.argv.slice(2);
-if (__argv[0] === "init") {
-  const { runInit } = await import("./cli.js");
+if (__argv[0] === "init" || __argv[0] === "uninstall") {
+  const cli = await import("./cli.js");
   try {
-    await runInit(__argv.slice(1));
+    await (__argv[0] === "init" ? cli.runInit : cli.runUninstall)(__argv.slice(1));
     process.exit(0);
   } catch (e) {
     console.error("✗ " + (e instanceof Error ? e.message : String(e)));

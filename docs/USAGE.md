@@ -31,6 +31,20 @@ node <ALE>/engine/dist/index.js init cursor --project . --profile-file ./dev_war
 > - Windsurf / Cline 的 MCP 配置在**全局**(没有项目级 mcp.json),`init` 会写规则文件并**打印需手动粘贴的 server 块**与位置。
 > - 重复 `init` 幂等:mcp 合并保留你其它 server,CLAUDE.md/AGENTS.md 不重复追加。
 
+## 卸载(一键)
+
+撤销某个 Agent 的安装,**精准移除 init 写入的内容**:
+
+```bash
+node <ALE>/engine/dist/index.js uninstall cursor --project .
+#   也支持 claude-code / windsurf-cline / agents-md
+```
+
+它会:删掉规则/命令文件、从 mcp 配置摘掉 `agent-loop`(**保留你其它 server**;摘空则删该文件)、从 `CLAUDE.md` / `AGENTS.md` 去掉 `<!-- agent-loop:begin/end -->` 包裹的那段(**保留你其余内容**;若整文件是它建的则删除)。
+
+> - **不会动** `.agent-loop/`(你的循环工作记忆/产物)与 `protocol/agent-loop-protocol.md`——需要可手动删。
+> - Windsurf / Cline 的 MCP 在全局,uninstall 删规则文件后会提示你**手动**从全局配置移除 `agent-loop`。
+
 下面是**手动安装**(逐文件复制)的方式,效果相同。
 
 ---
