@@ -20,7 +20,14 @@ import {
 } from "./state.js";
 import { DEFAULT_BUDGETS } from "./profile.js";
 import { buildResumeText } from "./resume.js";
-import { parseArgs, mergeMcpServers, appendSnippetIdempotent, resolveProfileEnv } from "./cli.js";
+import {
+  parseArgs,
+  mergeMcpServers,
+  appendSnippetIdempotent,
+  resolveProfileEnv,
+  removeSnippet,
+  removeMcpServer,
+} from "./cli.js";
 
 let pass = 0;
 let fail = 0;
@@ -206,6 +213,20 @@ const r2 = resolveProfileEnv({ project: "/p", profile: "myprof" });
 check("resolveProfileEnv --profile 设 env 不拷文件", r2.envName === "myprof" && !r2.copyFile);
 const r3 = resolveProfileEnv({ project: "/p", profileFile: "/some/dev_warren_agent.json" });
 check("resolveProfileEnv --profile-file 拷到项目 .agent-loop/profiles", r3.envName === "dev_warren_agent" && !!r3.copyFile && r3.copyFile.to.includes(".agent-loop/profiles/dev_warren_agent.json"));
+
+// ===== uninstall 纯函数 =====
+const insPre = appendSnippetIdempotent("PRE", "BODY", "agent-loop").text;
+const remPre = removeSnippet(insPre, "agent-loop");
+check("removeSnippet 去块且保留原内容", remPre.changed && remPre.text.includes("PRE") && !remPre.text.includes("agent-loop:begin") && !remPre.text.includes("BODY"));
+check("removeSnippet 无块→no-op", removeSnippet("hello", "agent-loop").changed === false);
+check("removeSnippet 纯块移除后为空", removeSnippet(appendSnippetIdempotent(null, "BODY", "agent-loop").text, "agent-loop").text.trim() === "");
+
+const rmKeepOther = removeMcpServer(mergeMcpServers('{"mcpServers":{"other":{"command":"x"}}}', { command: "node", args: [], env: {} }), "agent-loop");
+const rmKeepObj = JSON.parse(rmKeepOther.text);
+check("removeMcpServer 删 agent-loop 保留 other", rmKeepOther.changed && !rmKeepObj.mcpServers["agent-loop"] && !!rmKeepObj.mcpServers.other && rmKeepOther.empty === false);
+const rmEmpty = removeMcpServer(mergeMcpServers(null, { command: "node", args: [], env: {} }), "agent-loop");
+check("removeMcpServer 删后 empty=true", rmEmpty.changed && rmEmpty.empty === true);
+check("removeMcpServer 无该 server→no-op", removeMcpServer('{"mcpServers":{"x":{}}}', "agent-loop").changed === false);
 
 console.log(`\n结果:${pass} 通过 / ${fail} 失败`);
 await fs.rm(tmp, { recursive: true, force: true });

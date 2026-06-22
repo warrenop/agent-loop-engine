@@ -96,5 +96,49 @@ const rm = (p) => fs.rmSync(p, { recursive: true, force: true });
   rm(proj);
 }
 
+// 6) uninstall cursor:删 rules/commands、mcp 去 agent-loop 保留 other、保留 .agent-loop 数据
+{
+  const proj = mktmp();
+  fs.mkdirSync(path.join(proj, ".cursor"), { recursive: true });
+  fs.writeFileSync(path.join(proj, ".cursor/mcp.json"), JSON.stringify({ mcpServers: { other: { command: "x" } } }), "utf8");
+  init(["cursor", "--project", proj]);
+  fs.mkdirSync(path.join(proj, ".agent-loop/sometask"), { recursive: true });
+  fs.writeFileSync(path.join(proj, ".agent-loop/sometask/state.json"), "{}", "utf8");
+  execFileSync("node", [entry, "uninstall", "cursor", "--project", proj], { encoding: "utf8" });
+  ok(
+    "uninstall cursor: 删 rules/commands",
+    !has(path.join(proj, ".cursor/rules/agent-loop.mdc")) && !has(path.join(proj, ".cursor/commands/loop.md"))
+  );
+  const m = JSON.parse(read(path.join(proj, ".cursor/mcp.json"))).mcpServers;
+  ok("uninstall cursor: mcp 去 agent-loop、保留 other", !m["agent-loop"] && !!m.other);
+  ok("uninstall cursor: 保留 .agent-loop 数据", has(path.join(proj, ".agent-loop/sometask/state.json")));
+  rm(proj);
+}
+
+// 7) uninstall claude-code:删命令 + 去 CLAUDE.md 段(init 建的纯块文件→删除)
+{
+  const proj = mktmp();
+  init(["claude-code", "--project", proj]);
+  execFileSync("node", [entry, "uninstall", "claude-code", "--project", proj], { encoding: "utf8" });
+  ok("uninstall claude-code: 删 .claude/commands/loop.md", !has(path.join(proj, ".claude/commands/loop.md")));
+  const claudeGone = !has(path.join(proj, "CLAUDE.md")) || !read(path.join(proj, "CLAUDE.md")).includes("agent-loop:begin");
+  ok("uninstall claude-code: CLAUDE.md 不再含 agent-loop 段", claudeGone);
+  rm(proj);
+}
+
+// 8) uninstall 保留用户原有 CLAUDE.md 内容,只去 agent-loop 段
+{
+  const proj = mktmp();
+  fs.writeFileSync(path.join(proj, "CLAUDE.md"), "# 我的项目说明\n保留我\n", "utf8");
+  init(["claude-code", "--project", proj]);
+  execFileSync("node", [entry, "uninstall", "claude-code", "--project", proj], { encoding: "utf8" });
+  const c = read(path.join(proj, "CLAUDE.md"));
+  ok(
+    "uninstall: 保留用户 CLAUDE.md 内容、仅去 agent-loop 段",
+    c.includes("我的项目说明") && c.includes("保留我") && !c.includes("agent-loop:begin")
+  );
+  rm(proj);
+}
+
 console.log(`\ninit e2e 结果:${pass} 通过 / ${fail} 失败`);
 process.exit(fail === 0 ? 0 : 1);
