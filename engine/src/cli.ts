@@ -123,6 +123,164 @@ export function removeMcpServer(
   return { text: JSON.stringify(obj, null, 2) + "\n", changed: true, empty };
 }
 
+/**
+ * 合并预算 hook 进 Claude Code 的 settings.json(hooks.PreToolUse)。
+ * 以固定 command 作身份:重复 init 幂等替换我们这条,保留用户其它 hook。
+ */
+export function mergeClaudeHook(existing: string | null, command: string): string {
+  let obj: Record<string, any> = {};
+  if (existing && existing.trim()) {
+    const parsed = JSON.parse(existing);
+    if (parsed && typeof parsed === "object") obj = parsed;
+  }
+  obj.hooks = obj.hooks || {};
+  const arr: any[] = Array.isArray(obj.hooks.PreToolUse) ? obj.hooks.PreToolUse : [];
+  const isOurs = (e: any) =>
+    e && Array.isArray(e.hooks) && e.hooks.some((h: any) => h && h.command === command);
+  const kept = arr.filter((e) => !isOurs(e));
+  kept.push({ matcher: "Read|Grep|Glob", hooks: [{ type: "command", command }] });
+  obj.hooks.PreToolUse = kept;
+  return JSON.stringify(obj, null, 2) + "\n";
+}
+
+/** 从 Claude settings.json 摘掉我们的 PreToolUse hook。empty 表示删后整个对象已空。 */
+export function removeClaudeHook(
+  existing: string | null,
+  command: string
+): { text: string; changed: boolean; empty: boolean } {
+  if (!existing || !existing.trim()) return { text: existing ?? "", changed: false, empty: false };
+  let obj: Record<string, any>;
+  try {
+    obj = JSON.parse(existing);
+  } catch {
+    return { text: existing, changed: false, empty: false };
+  }
+  const arr: any[] = obj?.hooks?.PreToolUse;
+  if (!Array.isArray(arr)) return { text: existing, changed: false, empty: false };
+  const isOurs = (e: any) =>
+    e && Array.isArray(e.hooks) && e.hooks.some((h: any) => h && h.command === command);
+  const kept = arr.filter((e) => !isOurs(e));
+  if (kept.length === arr.length) return { text: existing, changed: false, empty: false };
+  if (kept.length) obj.hooks.PreToolUse = kept;
+  else delete obj.hooks.PreToolUse;
+  if (obj.hooks && Object.keys(obj.hooks).length === 0) delete obj.hooks;
+  const empty = Object.keys(obj).length === 0;
+  return { text: JSON.stringify(obj, null, 2) + "\n", changed: true, empty };
+}
+
+/**
+ * 给 Claude Code settings.json 的 permissions.allow 幂等增加一项(如 mcp__agent-loop),
+ * 让引擎自己的 MCP 工具(loop_record 等)不被自动模式安全分类器拦。
+ */
+export function mergeClaudeAllow(existing: string | null, entry: string): string {
+  let obj: Record<string, any> = {};
+  if (existing && existing.trim()) {
+    const parsed = JSON.parse(existing);
+    if (parsed && typeof parsed === "object") obj = parsed;
+  }
+  obj.permissions = obj.permissions || {};
+  const allow: any[] = Array.isArray(obj.permissions.allow) ? obj.permissions.allow : [];
+  if (!allow.includes(entry)) allow.push(entry);
+  obj.permissions.allow = allow;
+  return JSON.stringify(obj, null, 2) + "\n";
+}
+
+/** 从 Claude settings.json 的 permissions.allow 摘掉某项。empty 表示删后整个对象已空。 */
+export function removeClaudeAllow(
+  existing: string | null,
+  entry: string
+): { text: string; changed: boolean; empty: boolean } {
+  if (!existing || !existing.trim()) return { text: existing ?? "", changed: false, empty: false };
+  let obj: Record<string, any>;
+  try {
+    obj = JSON.parse(existing);
+  } catch {
+    return { text: existing, changed: false, empty: false };
+  }
+  const allow = obj?.permissions?.allow;
+  if (!Array.isArray(allow) || !allow.includes(entry))
+    return { text: existing, changed: false, empty: Object.keys(obj).length === 0 };
+  const kept = allow.filter((x: any) => x !== entry);
+  if (kept.length) obj.permissions.allow = kept;
+  else delete obj.permissions.allow;
+  if (obj.permissions && Object.keys(obj.permissions).length === 0) delete obj.permissions;
+  const empty = Object.keys(obj).length === 0;
+  return { text: JSON.stringify(obj, null, 2) + "\n", changed: true, empty };
+}
+
+/**
+ * 合并预算 hook 进 Cursor 的 hooks.json(beforeReadFile + beforeShellExecution)。
+ * Cursor 无原生搜索 hook,故只能数文件读取与终端 grep/find。以 command 作身份,幂等。
+ */
+export function mergeCursorHooks(existing: string | null, command: string): string {
+  let obj: Record<string, any> = {};
+  if (existing && existing.trim()) {
+    const parsed = JSON.parse(existing);
+    if (parsed && typeof parsed === "object") obj = parsed;
+  }
+  obj.version = obj.version || 1;
+  obj.hooks = obj.hooks || {};
+  const put = (event: string, entry: Record<string, unknown>) => {
+    const arr: any[] = Array.isArray(obj.hooks[event]) ? obj.hooks[event] : [];
+    const kept = arr.filter((e) => !(e && e.command === command));
+    kept.push(entry);
+    obj.hooks[event] = kept;
+  };
+  put("beforeReadFile", { command });
+  put("beforeShellExecution", { command, matcher: "grep|rg|egrep|fgrep|ag|find" });
+  return JSON.stringify(obj, null, 2) + "\n";
+}
+
+/** 从 Cursor hooks.json 摘掉我们的 hook。empty 表示删后只剩 version / 已空。 */
+export function removeCursorHooks(
+  existing: string | null,
+  command: string
+): { text: string; changed: boolean; empty: boolean } {
+  if (!existing || !existing.trim()) return { text: existing ?? "", changed: false, empty: false };
+  let obj: Record<string, any>;
+  try {
+    obj = JSON.parse(existing);
+  } catch {
+    return { text: existing, changed: false, empty: false };
+  }
+  if (!obj.hooks || typeof obj.hooks !== "object")
+    return { text: existing, changed: false, empty: false };
+  let changed = false;
+  for (const event of Object.keys(obj.hooks)) {
+    const arr = obj.hooks[event];
+    if (!Array.isArray(arr)) continue;
+    const kept = arr.filter((e: any) => !(e && e.command === command));
+    if (kept.length !== arr.length) {
+      changed = true;
+      if (kept.length) obj.hooks[event] = kept;
+      else delete obj.hooks[event];
+    }
+  }
+  if (obj.hooks && Object.keys(obj.hooks).length === 0) delete obj.hooks;
+  const empty = Object.keys(obj).filter((k) => k !== "version").length === 0;
+  return { text: changed ? JSON.stringify(obj, null, 2) + "\n" : existing, changed, empty };
+}
+
+/** 读取 JSON 配置;非法 JSON 则备份为 .bak 并返回 null(交由调用方重写)。 */
+async function loadJsonConfig(
+  dst: string,
+  log: (m: string) => void,
+  label: string
+): Promise<string | null> {
+  if (!existsSync(dst)) return null;
+  const existing = await fs.readFile(dst, "utf8");
+  if (existing.trim()) {
+    try {
+      JSON.parse(existing);
+    } catch {
+      await fs.copyFile(dst, dst + ".bak");
+      log(`  ⚠️ ${label} 非合法 JSON,已备份为 ${label}.bak 后重写`);
+      return null;
+    }
+  }
+  return existing;
+}
+
 // ===== 表驱动:四类 agent 的「源→目标」映射 =====
 interface FileCopy {
   from: string; // 相对 assetsRoot
@@ -133,6 +291,8 @@ interface AgentSpec {
   files: FileCopy[]; // 直接拷贝(rules/commands)
   snippets: FileCopy[]; // 幂等追加(CLAUDE.md / AGENTS.md)
   mcpTarget?: string; // 需合并 mcpServers 的项目内文件
+  claudeHookTarget?: string; // Claude Code:合并预算 hook 的 settings.json
+  cursorHookTarget?: string; // Cursor:合并预算 hook 的 .cursor/hooks.json
   globalMcpNote?: boolean; // windsurf/cline:打印全局注册指引
 }
 
@@ -145,12 +305,14 @@ const AGENTS: Record<string, AgentSpec> = {
     ],
     snippets: [],
     mcpTarget: ".cursor/mcp.json",
+    cursorHookTarget: ".cursor/hooks.json",
   },
   "claude-code": {
     label: "Claude Code",
     files: [{ from: "claude-code/.claude/commands/loop.md", to: ".claude/commands/loop.md" }],
     snippets: [{ from: "claude-code/CLAUDE.snippet.md", to: "CLAUDE.md" }],
     mcpTarget: ".mcp.json",
+    claudeHookTarget: ".claude/settings.json",
   },
   "windsurf-cline": {
     label: "Windsurf / Cline",
@@ -171,6 +333,7 @@ const AGENTS: Record<string, AgentSpec> = {
 const here = path.dirname(fileURLToPath(import.meta.url)); // engine/dist
 const assetsRoot = path.resolve(here, "..", "assets", "agents");
 const engineEntry = path.resolve(here, "index.js"); // 本机引擎入口绝对路径(随克隆位置自动正确)
+const hookCommand = `node ${engineEntry} hook`; // 预算 hook 命令(host 侧自动计数)
 
 function serverBlock(envName: string): Record<string, unknown> {
   return { command: "node", args: [engineEntry], env: { AGENT_LOOP_PROFILE: envName } };
@@ -225,6 +388,25 @@ export async function runInit(args: string[]): Promise<void> {
     await fs.mkdir(path.dirname(dst), { recursive: true });
     await fs.writeFile(dst, merged, "utf8");
     log(`  ✓ 合并 mcp 配置 → ${spec.mcpTarget}(本机 node 入口)`);
+  }
+
+  // 预算 hook:让 INVESTIGATE 探索预算从「自报」变「host 自动计数」
+  if (spec.claudeHookTarget) {
+    const dst = path.join(opts.project, spec.claudeHookTarget);
+    const existing = await loadJsonConfig(dst, log, spec.claudeHookTarget);
+    let text = mergeClaudeHook(existing, hookCommand);
+    text = mergeClaudeAllow(text, "mcp__agent-loop");
+    await fs.mkdir(path.dirname(dst), { recursive: true });
+    await fs.writeFile(dst, text, "utf8");
+    log(`  ✓ 安装预算 hook → ${spec.claudeHookTarget}(PreToolUse 自动计数 Read/Grep/Glob;默认 warn)`);
+    log(`  ✓ 允许 agent-loop MCP 工具 → ${spec.claudeHookTarget}(permissions.allow,免被自动模式拦 loop_record)`);
+  }
+  if (spec.cursorHookTarget) {
+    const dst = path.join(opts.project, spec.cursorHookTarget);
+    const existing = await loadJsonConfig(dst, log, spec.cursorHookTarget);
+    await fs.mkdir(path.dirname(dst), { recursive: true });
+    await fs.writeFile(dst, mergeCursorHooks(existing, hookCommand), "utf8");
+    log(`  ✓ 安装预算 hook → ${spec.cursorHookTarget}(beforeReadFile 数文件读取;原生搜索无 hook,未计→仍可手动 loop_budget)`);
   }
 
   if (prof.copyFile) {
@@ -307,6 +489,45 @@ export async function runUninstall(args: string[]): Promise<void> {
       } else {
         await fs.writeFile(dst, text, "utf8");
         log(`  ✓ 从 ${spec.mcpTarget} 移除 agent-loop(保留其它 server)`);
+      }
+    }
+  }
+
+  // Claude settings:移除预算 hook + mcp 允许项(两者一起决定是否删文件)
+  if (spec.claudeHookTarget) {
+    const dst = path.join(opts.project, spec.claudeHookTarget);
+    if (!existsSync(dst)) {
+      log(`  • ${spec.claudeHookTarget} 不存在,跳过`);
+    } else {
+      const h = removeClaudeHook(await fs.readFile(dst, "utf8"), hookCommand);
+      const a = removeClaudeAllow(h.text, "mcp__agent-loop");
+      const changed = h.changed || a.changed;
+      if (!changed) {
+        log(`  • ${spec.claudeHookTarget} 无 agent-loop hook/允许项,跳过`);
+      } else if (a.text.replace(/\s/g, "") === "{}") {
+        await fs.rm(dst);
+        log(`  ✓ 从 ${spec.claudeHookTarget} 移除预算 hook + mcp 允许项(已空 → 删除文件)`);
+      } else {
+        await fs.writeFile(dst, a.text, "utf8");
+        log(`  ✓ 从 ${spec.claudeHookTarget} 移除预算 hook + mcp 允许项(保留其它设置)`);
+      }
+    }
+  }
+  // Cursor hooks:移除预算 hook
+  if (spec.cursorHookTarget) {
+    const dst = path.join(opts.project, spec.cursorHookTarget);
+    if (!existsSync(dst)) {
+      log(`  • ${spec.cursorHookTarget} 不存在,跳过`);
+    } else {
+      const { text, changed, empty } = removeCursorHooks(await fs.readFile(dst, "utf8"), hookCommand);
+      if (!changed) {
+        log(`  • ${spec.cursorHookTarget} 无 agent-loop hook,跳过`);
+      } else if (empty) {
+        await fs.rm(dst);
+        log(`  ✓ 从 ${spec.cursorHookTarget} 移除预算 hook(已空 → 删除文件)`);
+      } else {
+        await fs.writeFile(dst, text, "utf8");
+        log(`  ✓ 从 ${spec.cursorHookTarget} 移除预算 hook(保留其它设置)`);
       }
     }
   }

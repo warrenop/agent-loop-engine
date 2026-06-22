@@ -12,6 +12,7 @@
 | 常驻指针 | `.cursor/rules` | `CLAUDE.md` 段 | `.clinerules` / `.windsurf/rules` | `AGENTS.md` 段 |
 | 批准后续跑方式 | `/clear` 再 `/loop` 无参 | **自动派 subagent**(无需 /clear) | 新对话里调 `loop_resume` | 新对话里调 `loop_resume` |
 | MCP 注册位置 | 项目 `.cursor/mcp.json` | 项目 `.mcp.json` | **全局**(手动配) | 由所在客户端 |
+| 探索预算自动计数(host hook) | ⚠️ 仅文件读取(原生搜索无 hook) | ✅ Read/Grep/Glob 全自动 | ❌ 手动 `loop_budget` | ❌ 手动 `loop_budget` |
 
 > **无斜杠命令的 Agent(Windsurf / Cline / 通用 AGENTS.md)** 用法不同:没有 `/loop`,靠常驻规则自律走六阶段;**续跑** = 在新对话 / 清空上下文后让它**直接调 MCP 工具 `loop_resume`**;**MCP** 需按客户端要求**手动注册到全局**(`init` 会写好规则文件并打印待粘贴的 server 块与位置)。
 >
@@ -37,7 +38,7 @@ node <ALE>/engine/dist/index.js init windsurf-cline  --project .
 node <ALE>/engine/dist/index.js init agents-md       --project .
 ```
 
-`init` 会:写入该 Agent 的规则/命令文件、把 `agent-loop` 以**本机 node 入口**写进 mcp 配置(绝对路径**自动填对,你不用手改**)、落地协议到 `protocol/`、按需设置 profile。装完重载 Agent 即可用 `/loop`。
+`init` 会:写入该 Agent 的规则/命令文件、把 `agent-loop` 以**本机 node 入口**写进 mcp 配置(绝对路径**自动填对,你不用手改**)、**装上探索预算 hook**(Cursor → `.cursor/hooks.json`;Claude Code → `.claude/settings.json`,host 自动计数,见第 4 节)、**在 Claude Code 的 settings.json 里允许 agent-loop MCP 工具**(`permissions.allow`,免被自动模式拦 `loop_record`)、落地协议到 `protocol/`、按需设置 profile。装完重载 Agent 即可用 `/loop`。
 
 带上你的定制 profile(落到项目级 `.agent-loop/profiles/`):
 
@@ -152,6 +153,21 @@ npm test               # 可选:全量自检(构建 + smoke + 集成),应全绿
 
 换项目:复制一份 `profiles/<新项目>.json`,把各 Agent mcp 配置里的 `AGENT_LOOP_PROFILE` 改成新名即可。也可在 `loop_start` 时显式传 `profile`。
 
+### 自动预算 hook(host 自动计数,`init` 已自动装)
+
+默认 INVESTIGATE 探索预算靠 agent 自觉调 `loop_budget` 上报;`init` 现在会顺带装一个 **host 侧 hook**,把计数变**自动**——不同 Agent 覆盖面不同:
+
+- **Claude Code**(`.claude/settings.json` 的 `PreToolUse`):自动计数 **Read / Grep / Glob**,超预算时给 agent 注入提醒。最完整。
+- **Cursor**(`.cursor/hooks.json` 的 `beforeReadFile`):自动计数**文件读取**;但 Cursor 的**原生 codebase 搜索/grep 没有 hook**(非 shell 命令),数不到——这部分仍需 agent 手动 `loop_budget grep` 补报(终端里跑的 `grep/rg/find` 经 `beforeShellExecution` 能数到)。
+- **Windsurf / Cline / AGENTS.md**:无对应 hook,继续手动 `loop_budget`。
+
+**两种力度**(环境变量 `AGENT_LOOP_BUDGET_ENFORCE`):
+- `warn`(默认):超预算只**提醒**(Claude Code 注入 agent 上下文;Cursor 经 `beforeReadFile` 显示给用户),不拦。
+- `block`:超预算**直接拦**该次 Read/Grep(`deny`),逼 agent 收敛去 PLAN。开启:在客户端环境里设 `AGENT_LOOP_BUDGET_ENFORCE=block`(或改 hook 命令前置该变量)。
+
+> 为什么默认 warn:预算卡太硬会「没摸透就被赶去 PLAN」反而返工。先 warn 观察,确有失控再切 block。
+> 该 hook **fail-open**:任何异常都放行,绝不挡住正常工具。`uninstall` 会一并摘掉它(保留你其它 hook/设置)。
+
 ## 5. 验证安装成功
 
 - 触发 `/loop 测试任务`,看是否在项目根生成 `.agent-loop/测试任务/`。
@@ -163,4 +179,5 @@ npm test               # 可选:全量自检(构建 + smoke + 集成),应全绿
 - **`.agent-loop/` 跑到奇怪的位置**:该 Agent 启动 MCP 时 cwd 不是项目根。在 mcp 配置 `env` 里加 `"AGENT_LOOP_ROOT": "/abs/项目根"`。
 - **profile 没生效(status 显示 default)**:`profiles/<名>.json` 不存在或 `AGENT_LOOP_PROFILE` 拼错;也可在 `loop_start` 显式传 `profile`。
 - **没有 MCP 的 Agent**:走降级——把 `protocol/agent-loop-protocol.md` 放进规则槽,Agent 自律执行六阶段并手动维护 `.agent-loop/` 文件。
+- **Claude Code 自动模式拦了 `loop_record` / MCP 调用**:`init claude-code` 已把 `mcp__agent-loop` 写进 `.claude/settings.json` 的 `permissions.allow`;若仍被拦,确认该项存在或手动补上。
 - **引擎改了路径/代码**:重新 `npm run build`,并更新各 mcp 配置里的绝对路径。

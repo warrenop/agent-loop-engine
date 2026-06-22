@@ -32,6 +32,11 @@ if (__argv[0] === "init" || __argv[0] === "uninstall") {
     process.exit(1);
   }
 }
+// `hook`:host 侧 PreToolUse/beforeReadFile 钩子入口,读 stdin 自动计数探索预算。fail-open。
+if (__argv[0] === "hook") {
+  const { runHook } = await import("./hook.js");
+  await runHook(); // 自行 process.exit(0)
+}
 
 type TextResult = { content: { type: "text"; text: string }[]; isError?: boolean };
 
