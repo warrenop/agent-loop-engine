@@ -169,6 +169,46 @@ export function removeClaudeHook(
 }
 
 /**
+ * 给 Claude Code settings.json 的 permissions.allow 幂等增加一项(如 mcp__agent-loop),
+ * 让引擎自己的 MCP 工具(loop_record 等)不被自动模式安全分类器拦。
+ */
+export function mergeClaudeAllow(existing: string | null, entry: string): string {
+  let obj: Record<string, any> = {};
+  if (existing && existing.trim()) {
+    const parsed = JSON.parse(existing);
+    if (parsed && typeof parsed === "object") obj = parsed;
+  }
+  obj.permissions = obj.permissions || {};
+  const allow: any[] = Array.isArray(obj.permissions.allow) ? obj.permissions.allow : [];
+  if (!allow.includes(entry)) allow.push(entry);
+  obj.permissions.allow = allow;
+  return JSON.stringify(obj, null, 2) + "\n";
+}
+
+/** 从 Claude settings.json 的 permissions.allow 摘掉某项。empty 表示删后整个对象已空。 */
+export function removeClaudeAllow(
+  existing: string | null,
+  entry: string
+): { text: string; changed: boolean; empty: boolean } {
+  if (!existing || !existing.trim()) return { text: existing ?? "", changed: false, empty: false };
+  let obj: Record<string, any>;
+  try {
+    obj = JSON.parse(existing);
+  } catch {
+    return { text: existing, changed: false, empty: false };
+  }
+  const allow = obj?.permissions?.allow;
+  if (!Array.isArray(allow) || !allow.includes(entry))
+    return { text: existing, changed: false, empty: Object.keys(obj).length === 0 };
+  const kept = allow.filter((x: any) => x !== entry);
+  if (kept.length) obj.permissions.allow = kept;
+  else delete obj.permissions.allow;
+  if (obj.permissions && Object.keys(obj.permissions).length === 0) delete obj.permissions;
+  const empty = Object.keys(obj).length === 0;
+  return { text: JSON.stringify(obj, null, 2) + "\n", changed: true, empty };
+}
+
+/**
  * 合并预算 hook 进 Cursor 的 hooks.json(beforeReadFile + beforeShellExecution)。
  * Cursor 无原生搜索 hook,故只能数文件读取与终端 grep/find。以 command 作身份,幂等。
  */
@@ -354,9 +394,12 @@ export async function runInit(args: string[]): Promise<void> {
   if (spec.claudeHookTarget) {
     const dst = path.join(opts.project, spec.claudeHookTarget);
     const existing = await loadJsonConfig(dst, log, spec.claudeHookTarget);
+    let text = mergeClaudeHook(existing, hookCommand);
+    text = mergeClaudeAllow(text, "mcp__agent-loop");
     await fs.mkdir(path.dirname(dst), { recursive: true });
-    await fs.writeFile(dst, mergeClaudeHook(existing, hookCommand), "utf8");
+    await fs.writeFile(dst, text, "utf8");
     log(`  ✓ 安装预算 hook → ${spec.claudeHookTarget}(PreToolUse 自动计数 Read/Grep/Glob;默认 warn)`);
+    log(`  ✓ 允许 agent-loop MCP 工具 → ${spec.claudeHookTarget}(permissions.allow,免被自动模式拦 loop_record)`);
   }
   if (spec.cursorHookTarget) {
     const dst = path.join(opts.project, spec.cursorHookTarget);
@@ -450,23 +493,42 @@ export async function runUninstall(args: string[]): Promise<void> {
     }
   }
 
-  for (const target of [spec.claudeHookTarget, spec.cursorHookTarget]) {
-    if (!target) continue;
-    const dst = path.join(opts.project, target);
+  // Claude settings:移除预算 hook + mcp 允许项(两者一起决定是否删文件)
+  if (spec.claudeHookTarget) {
+    const dst = path.join(opts.project, spec.claudeHookTarget);
     if (!existsSync(dst)) {
-      log(`  • ${target} 不存在,跳过`);
-      continue;
-    }
-    const remove = target === spec.claudeHookTarget ? removeClaudeHook : removeCursorHooks;
-    const { text, changed, empty } = remove(await fs.readFile(dst, "utf8"), hookCommand);
-    if (!changed) {
-      log(`  • ${target} 无 agent-loop hook,跳过`);
-    } else if (empty) {
-      await fs.rm(dst);
-      log(`  ✓ 从 ${target} 移除预算 hook(已空 → 删除文件)`);
+      log(`  • ${spec.claudeHookTarget} 不存在,跳过`);
     } else {
-      await fs.writeFile(dst, text, "utf8");
-      log(`  ✓ 从 ${target} 移除预算 hook(保留其它设置)`);
+      const h = removeClaudeHook(await fs.readFile(dst, "utf8"), hookCommand);
+      const a = removeClaudeAllow(h.text, "mcp__agent-loop");
+      const changed = h.changed || a.changed;
+      if (!changed) {
+        log(`  • ${spec.claudeHookTarget} 无 agent-loop hook/允许项,跳过`);
+      } else if (a.text.replace(/\s/g, "") === "{}") {
+        await fs.rm(dst);
+        log(`  ✓ 从 ${spec.claudeHookTarget} 移除预算 hook + mcp 允许项(已空 → 删除文件)`);
+      } else {
+        await fs.writeFile(dst, a.text, "utf8");
+        log(`  ✓ 从 ${spec.claudeHookTarget} 移除预算 hook + mcp 允许项(保留其它设置)`);
+      }
+    }
+  }
+  // Cursor hooks:移除预算 hook
+  if (spec.cursorHookTarget) {
+    const dst = path.join(opts.project, spec.cursorHookTarget);
+    if (!existsSync(dst)) {
+      log(`  • ${spec.cursorHookTarget} 不存在,跳过`);
+    } else {
+      const { text, changed, empty } = removeCursorHooks(await fs.readFile(dst, "utf8"), hookCommand);
+      if (!changed) {
+        log(`  • ${spec.cursorHookTarget} 无 agent-loop hook,跳过`);
+      } else if (empty) {
+        await fs.rm(dst);
+        log(`  ✓ 从 ${spec.cursorHookTarget} 移除预算 hook(已空 → 删除文件)`);
+      } else {
+        await fs.writeFile(dst, text, "utf8");
+        log(`  ✓ 从 ${spec.cursorHookTarget} 移除预算 hook(保留其它设置)`);
+      }
     }
   }
 

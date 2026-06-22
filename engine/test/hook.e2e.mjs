@@ -88,7 +88,7 @@ r = await runHook({ foo: "bar" });
 check("未知事件:无输出", r.stdout === "");
 
 // ===== CLI:hook 配置合并/移除的幂等性 =====
-const { mergeClaudeHook, removeClaudeHook, mergeCursorHooks, removeCursorHooks } = await import(
+const { mergeClaudeHook, removeClaudeHook, mergeCursorHooks, removeCursorHooks, mergeClaudeAllow, removeClaudeAllow } = await import(
   "../dist/cli.js"
 );
 const CMD = "node /abs/index.js hook";
@@ -114,6 +114,14 @@ check(
     rcp.hooks.PreToolUse.some((e) => e.hooks.some((h) => h.command === "user.sh"))
 );
 check("Claude 全新 settings remove → empty(可删文件)", removeClaudeHook(mergeClaudeHook(null, CMD), CMD).empty === true);
+
+// ===== CLI:permissions.allow 合并/移除(免自动模式拦 loop_record)=====
+const aw = JSON.parse(mergeClaudeAllow(mergeClaudeAllow(userSettings, "mcp__agent-loop"), "mcp__agent-loop")); // 两次
+check("Claude allow 幂等:mcp__agent-loop 只一条", aw.permissions.allow.filter((x) => x === "mcp__agent-loop").length === 1);
+check("Claude allow 保留用户 hooks 字段", !!aw.hooks);
+const raMid = removeClaudeAllow(mergeClaudeAllow(userSettings, "mcp__agent-loop"), "mcp__agent-loop");
+check("Claude removeAllow:去掉 mcp__agent-loop、用户其它还在", raMid.changed && !JSON.parse(raMid.text).permissions?.allow?.includes("mcp__agent-loop") && !!JSON.parse(raMid.text).hooks);
+check("Claude 仅 allow 的全新 settings remove → empty", removeClaudeAllow(mergeClaudeAllow(null, "mcp__agent-loop"), "mcp__agent-loop").empty === true);
 
 const cm2 = mergeCursorHooks(mergeCursorHooks(null, CMD), CMD); // 合并两次
 const cp = JSON.parse(cm2);

@@ -38,7 +38,7 @@ node <ALE>/engine/dist/index.js init windsurf-cline  --project .
 node <ALE>/engine/dist/index.js init agents-md       --project .
 ```
 
-`init` 会:写入该 Agent 的规则/命令文件、把 `agent-loop` 以**本机 node 入口**写进 mcp 配置(绝对路径**自动填对,你不用手改**)、**装上探索预算 hook**(Cursor → `.cursor/hooks.json`;Claude Code → `.claude/settings.json`,host 自动计数,见第 4 节)、落地协议到 `protocol/`、按需设置 profile。装完重载 Agent 即可用 `/loop`。
+`init` 会:写入该 Agent 的规则/命令文件、把 `agent-loop` 以**本机 node 入口**写进 mcp 配置(绝对路径**自动填对,你不用手改**)、**装上探索预算 hook**(Cursor → `.cursor/hooks.json`;Claude Code → `.claude/settings.json`,host 自动计数,见第 4 节)、**在 Claude Code 的 settings.json 里允许 agent-loop MCP 工具**(`permissions.allow`,免被自动模式拦 `loop_record`)、落地协议到 `protocol/`、按需设置 profile。装完重载 Agent 即可用 `/loop`。
 
 带上你的定制 profile(落到项目级 `.agent-loop/profiles/`):
 
@@ -179,4 +179,5 @@ npm test               # 可选:全量自检(构建 + smoke + 集成),应全绿
 - **`.agent-loop/` 跑到奇怪的位置**:该 Agent 启动 MCP 时 cwd 不是项目根。在 mcp 配置 `env` 里加 `"AGENT_LOOP_ROOT": "/abs/项目根"`。
 - **profile 没生效(status 显示 default)**:`profiles/<名>.json` 不存在或 `AGENT_LOOP_PROFILE` 拼错;也可在 `loop_start` 显式传 `profile`。
 - **没有 MCP 的 Agent**:走降级——把 `protocol/agent-loop-protocol.md` 放进规则槽,Agent 自律执行六阶段并手动维护 `.agent-loop/` 文件。
+- **Claude Code 自动模式拦了 `loop_record` / MCP 调用**:`init claude-code` 已把 `mcp__agent-loop` 写进 `.claude/settings.json` 的 `permissions.allow`;若仍被拦,确认该项存在或手动补上。
 - **引擎改了路径/代码**:重新 `npm run build`,并更新各 mcp 配置里的绝对路径。

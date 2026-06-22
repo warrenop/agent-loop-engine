@@ -53,6 +53,13 @@ const rm = (p) => fs.rmSync(p, { recursive: true, force: true });
     "claude-code: 写出 .mcp.json(node 入口)",
     JSON.parse(read(path.join(proj, ".mcp.json"))).mcpServers["agent-loop"].command === "node"
   );
+  const settings = JSON.parse(read(path.join(proj, ".claude/settings.json")));
+  ok(
+    "claude-code: settings.json 装了预算 hook(PreToolUse)",
+    Array.isArray(settings.hooks?.PreToolUse) &&
+      settings.hooks.PreToolUse.some((e) => e.hooks?.some((h) => /index\.js hook/.test(h.command || "")))
+  );
+  ok("claude-code: settings.json 允许 mcp__agent-loop", settings.permissions?.allow?.includes("mcp__agent-loop"));
   init(["claude-code", "--project", proj]); // 二次
   const c2 = read(path.join(proj, "CLAUDE.md"));
   const n = (c2.match(/<!-- agent-loop:begin -->/g) || []).length;
@@ -123,6 +130,7 @@ const rm = (p) => fs.rmSync(p, { recursive: true, force: true });
   ok("uninstall claude-code: 删 .claude/commands/loop.md", !has(path.join(proj, ".claude/commands/loop.md")));
   const claudeGone = !has(path.join(proj, "CLAUDE.md")) || !read(path.join(proj, "CLAUDE.md")).includes("agent-loop:begin");
   ok("uninstall claude-code: CLAUDE.md 不再含 agent-loop 段", claudeGone);
+  ok("uninstall claude-code: settings.json 的 hook+allow 已清(空则删文件)", !has(path.join(proj, ".claude/settings.json")));
   rm(proj);
 }
 
