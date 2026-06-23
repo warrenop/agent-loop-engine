@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "agent-loop": {
+      "command": "node",
+      "args": ["/abs/path/to/agent-loop-engine/engine/dist/index.js"],
+      "env": {
+        "AGENT_LOOP_PROFILE": "example_project"
+      }
+    }
+  }
+}

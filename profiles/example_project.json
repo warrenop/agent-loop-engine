@@ -1,0 +1,24 @@
+{
+  "name": "example_project",
+  "stack": "Java/Spring + Maven 多模块(groupId com.example / root demo-app)+ 前端(页面配置)+ MySQL(MyBatis mapper)",
+  "budgets": {
+    "read": 12,
+    "grep": 18,
+    "glob": 6,
+    "semanticSearch": 5,
+    "fetch": 2
+  },
+  "verify": "mvn -q -pl <改动的模块,如 app-admin> -am compile  # 有相关测试优先 -Dtest=<类> test;改动涉及多端/共用逻辑时逐个受影响模块都验,别只编单模块",
+  "intake": "需求若来自原型/PRD 链接(如 example.com),用浏览器 MCP 抓一次提炼成后端任务简报;注意需求常只写某一端,主动调研其它端是否也有同逻辑并列出待确认。",
+  "modules": {
+    "app-admin": "Web 入口 + Controller",
+    "app-application": "应用/服务层(service 编排)",
+    "app-domain": "领域实体 + MyBatis mapper(mapper XML 在 src/main/resources/mapper)",
+    "app-infrastructure": "基础设施/配置/通用组件",
+    "app-mobile": "移动端 / 小程序端",
+    "app-job": "定时任务",
+    "app-third": "三方对接"
+  },
+  "conventions": "新增接口放对应模块 controller;服务逻辑入 application;实体/查询入 domain(含 mapper XML)。改动外科手术式、最小化,优先复用已有 service/util(在 INVESTIGATE 记到 context-map 的「可复用项」)。",
+  "notes": "示例 profile:把模块/技术栈/验证命令改成你自己项目的即可。"
+}

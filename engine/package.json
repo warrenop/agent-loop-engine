@@ -1,0 +1,40 @@
+{
+  "name": "agent-loop-engine",
+  "version": "0.1.0",
+  "description": "Cross-agent six-phase development loop engine (MCP server). Externalizes working memory to disk and serves phase playbooks just-in-time to cut token usage.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "agent-loop-engine": "dist/index.js"
+  },
+  "main": "dist/index.js",
+  "files": [
+    "dist",
+    "!dist/smoke.js",
+    "profiles",
+    "assets"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "build:assets": "node scripts/build-assets.mjs",
+    "start": "node dist/index.js",
+    "smoke": "node dist/smoke.js",
+    "test:integration": "node test/integration.mjs",
+    "test:init": "node test/init.e2e.mjs",
+    "test:hook": "node test/hook.e2e.mjs",
+    "test": "npm run build && npm run build:assets && npm run smoke && npm run test:integration && npm run test:init && npm run test:hook",
+    "prepare": "npm run build && npm run build:assets",
+    "prepublishOnly": "npm run build && npm run build:assets"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
