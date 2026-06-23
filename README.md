@@ -1,59 +1,63 @@
-# Agent Loop Engine(ALE)
+# Agent Loop Engine (ALE)
 
-一套从 6 个真实开发 session 提炼出的**跨 Agent 开发循环引擎**:把每次「需求 → 交付」标准化成六阶段循环,并用「工作记忆落盘 + 阶段即时下发 + 计划/实现分上下文」三招显著降低 token 与散乱工具调用。
+> 🌐 **English (current)** · [中文](README.zh-CN.md)
 
-可装进 **Cursor / Claude Code / 通用 AGENTS.md / Windsurf / Cline**。
+A **cross-agent development-loop engine** distilled from 6 real coding sessions: it standardizes every "requirement → delivery" into a six-phase loop, and cuts token usage and scattered tool calls with three moves — **externalizing working memory to disk, serving phase playbooks just-in-time, and splitting plan vs. implementation into separate contexts**.
 
-## 快速安装(无需 npm 账号)
+Installs into **Cursor / Claude Code / generic AGENTS.md / Windsurf / Cline**.
 
-每台机器克隆一次并装依赖(`npm install` 自动构建),再到目标项目根一行装好:
+## Quick install (no npm account needed)
+
+Clone once per machine and install deps (`npm install` builds automatically), then one line per target project root:
 
 ```bash
 git clone https://github.com/warrenop/agent-loop-engine.git && cd agent-loop-engine/engine && npm install
-node "$(pwd)/dist/index.js" init cursor --project /路径/到/你的项目   # 或 claude-code / windsurf-cline / agents-md
+node "$(pwd)/dist/index.js" init cursor --project /path/to/your/project   # or claude-code / windsurf-cline / agents-md
 ```
 
-`init` 会写入规则/命令、把本机 node 入口写进 mcp 配置(路径自动填对)、**装探索预算 hook**(host 自动计数)、落地协议。卸载同样一行:`node <ALE>/engine/dist/index.js uninstall cursor --project .`(精准移除,保留你的 `.agent-loop/` 数据)。详见 [docs/USAGE.md](docs/USAGE.md)。
+`init` writes the rules/commands, points the mcp config at your local node entry (absolute path filled in automatically), **installs the exploration-budget hook** (host-side auto-counting), and lays down the protocol. Uninstall is one line too: `node <ALE>/engine/dist/index.js uninstall cursor --project .` (surgical removal, keeps your `.agent-loop/` data). See [docs/USAGE.md](docs/USAGE.md).
 
-## 它解决什么(来自实测,详见 [docs/ANALYSIS.md](docs/ANALYSIS.md))
+## What it solves (measured — see [docs/ANALYSIS.md](docs/ANALYSIS.md))
 
-- 探索类调用(Read/Grep/Glob/语义)占全部工具调用 **50–82%**,且结果永久驻留对话。
-- `conversation` 区占单 session 总开销 ~74%,常冲到 90K+。
-- 固定开销每 session ~34K(Rules 11.6K + Skills 10K + …)。
+- Exploration calls (Read/Grep/Glob/semantic search) are **50–82%** of all tool calls, and every result stays in the conversation forever.
+- The `conversation` segment is ~74% of a session's total cost, often ballooning past 90K tokens.
+- Fixed overhead is ~34K tokens per session (Rules 11.6K + Skills 10K + …).
 
-## 三层架构
+## Three-layer architecture
 
-1. **协议**(`protocol/agent-loop-protocol.md`)——跨 Agent 的六阶段规范,纯 markdown,无 MCP 时可降级直接用。
-2. **产物外置**(`.agent-loop/<任务>/`)——`context-map.md` / `plan.md` / `progress.md` 把工作记忆写到磁盘而非对话。**省 token 核心。**
-3. **MCP 引擎**(`engine/`,Node/TS)——按阶段即时下发 playbook、校验闸门、维护预算与产物。常驻规则只需一个指针指向它。
+1. **Protocol** (`protocol/agent-loop-protocol.md`) — the cross-agent six-phase spec, pure markdown; usable directly (degraded mode) without MCP.
+2. **Externalized artifacts** (`.agent-loop/<task>/`) — `context-map.md` / `plan.md` / `progress.md` write working memory to disk instead of the conversation. **The core token saver.**
+3. **MCP engine** (`engine/`, Node/TS) — serves each phase's playbook just-in-time, enforces gates, tracks budget and artifacts. The always-on rule is just a tiny pointer to it.
 
-## 六阶段
+## Six phases
 
-`INTAKE 录入 → CLARIFY 澄清 → INVESTIGATE 调研 → PLAN 计划 → IMPLEMENT 实现 → VERIFY 验证`
-每个阶段有**闸门**(如未澄清不进调研、未获批不进实现、无证据不算完)和(调研阶段)**探索预算**。
+`INTAKE → CLARIFY → INVESTIGATE → PLAN → IMPLEMENT → VERIFY`
+Each phase has a **gate** (e.g. no investigating before clarifying, no implementing before approval, not done without evidence) and, in INVESTIGATE, an **exploration budget**.
 
-## 目录
+> **Triage first:** pure lookups / Q&A and trivial one-line edits skip the loop; only feature work, bug hunts, and refactors enter it (investigation-heavy tasks are where the loop saves the most). If 5–10 tool calls answer it, don't wrap it in a loop.
+
+## Layout
 
 ```
-protocol/agent-loop-protocol.md   协议(核心规范 / 降级用)
-engine/                           MCP 引擎(loop_start/status/record/budget/advance/resume)
-profiles/dev_warren_agent.json    针对你仓库的定制(技术栈/验证命令/模块/预算)
-adapters/                         各 Agent 安装件:cursor / claude-code / agents-md / windsurf-cline
-docs/USAGE.md                     安装与日常使用说明
-docs/ANALYSIS.md                  优化分析(证据)
+protocol/agent-loop-protocol.md   protocol (core spec / degraded mode)
+engine/                           MCP engine (loop_start/status/record/budget/advance/resume)
+profiles/dev_warren_agent.json    project profile (stack / verify command / modules / budget)
+adapters/                         per-agent install kits: cursor / claude-code / agents-md / windsurf-cline
+docs/USAGE.md                     install & day-to-day usage
+docs/ANALYSIS.md                  optimization analysis (the evidence)
 ```
 
-## 各 Agent 支持情况
+## Per-agent support
 
-引擎(六阶段 / 闸门 / 预算 / `loop_resume`)对所有 Agent 通用,差异只在「怎么触发」。装法统一:`init <agent>`(见下)。
+The engine (six phases / gates / budget / `loop_resume`) is universal across agents; only *how you trigger it* differs. Install is uniform: `init <agent>` (above).
 
-| Agent | `/loop` 命令 | 批准后续跑 | MCP 配置 |
+| Agent | `/loop` command | Resume after approval | MCP config |
 |---|---|---|---|
-| Cursor | ✅ | `/clear` + `/loop` 无参 | 项目 `.cursor/mcp.json` |
-| Claude Code | ✅ | **自动派 subagent**(无需 /clear) | 项目 `.mcp.json` |
-| Windsurf / Cline | ❌(常驻规则) | 新对话调 `loop_resume` | **全局**(手动) |
-| 通用 AGENTS.md | ❌(常驻规则) | 新对话调 `loop_resume` | 由所在客户端 |
+| Cursor | ✅ | `/clear` then `/loop` (no args) | project `.cursor/mcp.json` |
+| Claude Code | ✅ | **auto-dispatch subagent** (no `/clear`) | project `.mcp.json` |
+| Windsurf / Cline | ❌ (always-on rule) | call `loop_resume` in a new chat | **global** (manual) |
+| Generic AGENTS.md | ❌ (always-on rule) | call `loop_resume` in a new chat | per host |
 
-> **探索预算自动计数(host hook,`init` 自动装)**:Claude Code 全自动(Read/Grep/Glob,`PreToolUse`)、Cursor 仅文件读取(`beforeReadFile`;原生搜索无 hook)、其余手动 `loop_budget`。默认 `warn`,可 `AGENT_LOOP_BUDGET_ENFORCE=block` 改硬拦。详见 USAGE 第 4 节。
+> **Exploration-budget auto-counting (host hook, installed by `init`):** Claude Code fully automatic (Read/Grep/Glob via `PreToolUse`), Cursor file reads only (`beforeReadFile`; native search has no hook), others manual `loop_budget`. Defaults to `warn`; set `AGENT_LOOP_BUDGET_ENFORCE=block` to hard-block. See USAGE §4.
 
-完整差异表、安装与用法见 **[docs/USAGE.md](docs/USAGE.md)**。
+Full capability table, install, and usage in **[docs/USAGE.md](docs/USAGE.md)**.
