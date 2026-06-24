@@ -34,6 +34,8 @@ export interface LoopState {
   slug: string;
   source: string | null;
   profile: string | null;
+  /** 本 loop 的展示语言(catalog 选择);缺省由 resolveLang 决定 */
+  lang: string;
   phase: Phase;
   createdAt: string;
   updatedAt: string;
@@ -129,6 +131,7 @@ export interface InitOptions {
   task: string;
   source?: string | null;
   profile?: string | null;
+  lang?: string;
   budgets: Record<string, number>;
 }
 
@@ -158,6 +161,7 @@ export async function initLoop(
     slug,
     source: opts.source ?? null,
     profile: opts.profile ?? null,
+    lang: opts.lang ?? process.env.AGENT_LOOP_LANG ?? "en",
     phase: "INTAKE",
     createdAt: now,
     updatedAt: now,
