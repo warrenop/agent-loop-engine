@@ -12,6 +12,7 @@
     "dist",
     "!dist/smoke.js",
     "profiles",
+    "loops",
     "assets"
   ],
   "scripts": {
