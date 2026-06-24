@@ -33,7 +33,7 @@ ok("引擎 dist 入口存在(build 后)", fs.existsSync(cfg.args[0]));
 const transport = new StdioClientTransport({
   command: cfg.command,
   args: cfg.args,
-  env: { ...process.env, ...(cfg.env || {}) }, // 含 AGENT_LOOP_PROFILE=example_project
+  env: { ...process.env, ...(cfg.env || {}), AGENT_LOOP_LANG: "zh-CN" }, // 含 example_project profile;用 zh-CN 包跑回归
   cwd: proj, // 关键:cwd=项目根,验证 .agent-loop/ 落到这里(无需 AGENT_LOOP_ROOT)
 });
 const client = new Client({ name: "integration", version: "0" });
@@ -118,6 +118,26 @@ ok("最终阶段=DONE 且 profile=example_project", state.phase === "DONE" && st
 // loop_resume:DONE 阶段仍可内联 plan(可追溯)
 const doneResume = await client.callTool({ name: "loop_resume", arguments: {} });
 ok("DONE 阶段 loop_resume 仍内联 plan(可追溯)", doneResume.isError !== true && txt(doneResume).includes("## plan.md"));
+
+// ===== 英文默认(#2):不设 AGENT_LOOP_LANG -> 引擎说英文 =====
+const enTransport = new StdioClientTransport({
+  command: cfg.command,
+  args: cfg.args,
+  env: { ...process.env, ...(cfg.env || {}) }, // 不含 AGENT_LOOP_LANG -> 默认 en
+  cwd: fs.mkdtempSync(path.join(os.tmpdir(), "ale-en-")),
+});
+const enClient = new Client({ name: "integration-en", version: "0" });
+await enClient.connect(enTransport);
+await enClient.callTool({ name: "loop_start", arguments: { task: "english default task" } });
+await enClient.callTool({ name: "loop_record", arguments: { artifact: "context-map", mode: "overwrite",
+  content: "## Summary\nGoal: english-default smoke. Surfaces: api. Acceptance: returns ok. Constraints: none." } });
+await enClient.callTool({ name: "loop_advance", arguments: { to: "CLARIFY" } });
+await enClient.callTool({ name: "loop_advance", arguments: { to: "INVESTIGATE", evidence: "no-questions" } });
+const enWarn = await enClient.callTool({ name: "loop_budget", arguments: { tool: "grep", n: 99 } });
+ok("英文默认:budget 文案为英文(over budget)", txt(enWarn).toLowerCase().includes("over budget"));
+const enReject = await enClient.callTool({ name: "loop_advance", arguments: { to: "PLAN" } });
+ok("英文默认:gate 报错为英文", enReject.isError === true && txt(enReject).toLowerCase().includes("context-map"));
+await enClient.close();
 
 await client.close();
 fs.rmSync(proj, { recursive: true, force: true });
