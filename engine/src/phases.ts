@@ -1,21 +1,5 @@
 import { LoopState, Phase, PHASE_ORDER } from "./state.js";
 
-export interface PhaseDef {
-  id: Phase;
-  /** does INVESTIGATE-style budget apply while in this phase? */
-  budgeted?: boolean;
-}
-
-export const PHASES: Record<Phase, PhaseDef> = {
-  INTAKE: { id: "INTAKE" },
-  CLARIFY: { id: "CLARIFY" },
-  INVESTIGATE: { id: "INVESTIGATE", budgeted: true },
-  PLAN: { id: "PLAN" },
-  IMPLEMENT: { id: "IMPLEMENT" },
-  VERIFY: { id: "VERIFY" },
-  DONE: { id: "DONE" },
-};
-
 export function phaseIndex(p: Phase): number {
   return PHASE_ORDER.indexOf(p);
 }

@@ -191,10 +191,10 @@ server.tool(
   },
   async ({ tool, n }): Promise<TextResult> => {
     const state = await getActiveState();
-    if (!state) return err((await loadCatalog()).ui["noActive"]);
+    const cat = await loadCatalog(state?.lang);
+    if (!state) return err(cat.ui["noActive"]);
     bumpUsage(state, tool, n ?? 1);
     await saveState(state);
-    const cat = await loadCatalog(state.lang);
     const limit = state.budgets[tool];
     const used = state.used[tool];
     if (limit === undefined) return ok(fmt(cat.ui["budget.noLimit"], { tool, used }));
@@ -213,8 +213,8 @@ server.tool(
   },
   async ({ to, evidence }): Promise<TextResult> => {
     const state = await getActiveState();
-    if (!state) return err((await loadCatalog()).ui["noActive"]);
-    const cat = await loadCatalog(state.lang);
+    const cat = await loadCatalog(state?.lang);
+    if (!state) return err(cat.ui["noActive"]);
     const gate = checkTransition(state, to as Phase, evidence);
     if (!gate.ok) {
       const reason = fmt(cat.gates[gate.reasonKey || ""] || gate.reasonKey || "", gate.reasonParams);
