@@ -1,0 +1,97 @@
+{
+  "lang": "en",
+  "phases": {
+    "INTAKE": {
+      "title": "Intake",
+      "reminder": "Intake only — no code. Write the requirement summary into context-map.md.",
+      "playbook": "## Phase 0 · INTAKE\nGoal: pin down WHAT to build as a short requirement summary. **Do not touch code yet.**\n\n1. If a prototype/PRD link is given: fetch it **once** with the browser MCP; if your project ships a PRD-extraction skill, reuse it instead of re-parsing.\n2. Write the summary (goal / surfaces involved / acceptance points / obvious constraints) with `loop_record context-map`.\n3. Then call `loop_advance CLARIFY`.\n\nGuardrails: fetch <=2 times; do not start exploring code; write the summary to disk, not into the conversation."
+    },
+    "CLARIFY": {
+      "title": "Clarify",
+      "reminder": "Merge all open questions into ONE ask; append answers to context-map.md.",
+      "playbook": "## Phase 1 · CLARIFY\nGoal: remove ambiguity before acting.\n\n1. List the questions that would change the implementation (scope / boundaries / change-everywhere? / trade-offs) and ask them **in one combined message** — no back-and-forth.\n2. After the answers, append a '## Clarifications' block with `loop_record context-map` (append).\n3. Call `loop_advance CLARIFY->INVESTIGATE`, stating the conclusion in evidence (or `no-questions`).\n\nGuardrail: no clarification conclusion and empty evidence -> not allowed to enter INVESTIGATE."
+    },
+    "INVESTIGATE": {
+      "title": "Investigate",
+      "reminder": "Locate before reading; never re-read a mapped file; write findings into context-map.md.",
+      "playbook": "## Phase 2 · INVESTIGATE (the key token-saving phase)\nGoal: map every change point with the least exploration and **write it to context-map.md**.\n\nDiscipline (G1-G3):\n- **Locate** with Grep/Glob/semantic search first, then read by **line range** — never whole files.\n- Read each file **once**: write key signatures / call chains / line numbers into context-map immediately; afterwards consult context-map, do not re-read.\n- **Batch** related searches; fire independent calls **in parallel** in one turn.\n- Usage counting: clients with the budget hook count **automatically** (Claude Code counts even searches; Cursor only file reads); for searches that aren't auto-counted (e.g. Cursor native grep) report manually with `loop_budget grep 1`.\n\ncontext-map must contain at least: involved files `path:line`, key function signatures, call chains, **reusable existing helpers/methods**, and a 'change-point coverage checklist'.\n\nWhen done, `loop_advance INVESTIGATE->PLAN`. Hitting the budget triggers a warning (80%) telling you to wrap up — that means stop scattering reads, not continue."
+    },
+    "PLAN": {
+      "title": "Plan",
+      "reminder": "Write plan.md; only user approval (evidence:'user-approved') unlocks IMPLEMENT.",
+      "playbook": "## Phase 3 · PLAN\nGoal: produce an executable, skimmable plan.md and get user approval.\n\n1. `loop_record plan` with: background / approach / **change list (per file: what + why)** / verification steps.\n2. Prefer **reusing** the existing helpers/methods recorded in context-map, citing their paths; keep changes surgical and minimal.\n3. Get user confirmation. Once approved, `loop_advance PLAN->IMPLEMENT` with `evidence: 'user-approved'`.\n\nGuardrail: plan.md not written or not approved -> not allowed to enter IMPLEMENT."
+    },
+    "IMPLEMENT": {
+      "title": "Implement",
+      "reminder": "Small/none -> finish in this session; substantial -> continue in a clean context (/clear then /loop, or a subagent); precise edits; update progress.md each step.",
+      "playbook": "## Phase 4 · IMPLEMENT\nGoal: land the plan without blowing up the context.\n\n✅ State is saved. **Look at the plan's change list first:**\n- **Empty / tiny (no real code change, e.g. already exists)**: finish IMPLEMENT->VERIFY in **this session**; no /clear or subagent needed.\n- **Substantial multi-step change**: continue in a **clean context** (without the long INVESTIGATE conversation) —\n  - Universal: `/clear` then run `/loop` (no args) -> the engine `loop_resume` inlines plan + context-map and continues.\n  - Claude Code can also dispatch a subagent from the main session directly (no /clear).\n  - Clients without slash commands: call `loop_resume` in a new chat.\n\nDiscipline:\n- Use **precise StrReplace**, not whole-file Write (whole-file dumps the entire text into context and pins it forever).\n- One logical change at a time; tick it off with `loop_record progress` (append) after each step.\n- Change only what the plan says; clean up orphan imports/vars you create; do not refactor unrelated code.\n\nWhen all done, `loop_advance IMPLEMENT->VERIFY`."
+    },
+    "VERIFY": {
+      "title": "Verify",
+      "reminder": "Run the verify command; record command + output into progress.md; on failure go back to IMPLEMENT.",
+      "playbook": "## Phase 5 · VERIFY\nGoal: prove the change works with evidence.\n\n1. **Scope self-check**: confirm the actually-changed files (`git diff --stat`) all fall within plan.md's change list; explain or revert extras.\n2. Run the verify command (see profile's verify). When the change touches **multiple surfaces / shared logic**, verify each affected surface — don't compile just one module.\n3. Record **command + key output** with `loop_record progress` (append).\n4. Pass -> `loop_advance VERIFY->DONE` (evidence `passed: <cmd>`; negatives like fail/not-passed are rejected). Fail -> `loop_advance VERIFY->IMPLEMENT` to fix.\n\nGuardrail: no passing evidence -> not allowed into DONE; evidence containing a negation is rejected."
+    },
+    "DONE": {
+      "title": "Done",
+      "reminder": "Loop complete.",
+      "playbook": "## ✅ DONE\nThis loop is finished. `.agent-loop/<task>/` keeps context-map / plan / progress as a traceable record.\nFor wrap-up (merge branch / open PR), continue with your usual flow."
+    }
+  },
+  "gates": {
+    "done-terminal": "loop already finished (DONE). Start a new task with loop_start to rework.",
+    "already-in": "already in phase {from}.",
+    "no-skip": "cannot skip phases: currently {from}, you may only enter the next phase {next}.",
+    "INTAKE": "Write the requirement summary into context-map with loop_record context-map first (>=40 chars).",
+    "CLARIFY": "State the clarification conclusion in evidence (>=12 chars, or include 'no-questions'), or record it into context-map first.",
+    "INVESTIGATE": "context-map has too few findings (need >=200 chars); add involved files/signatures/call-chains/reusables and the coverage checklist.",
+    "plan-missing": "Write the plan with loop_record plan first.",
+    "plan-unapproved": "plan.md is ready. Confirm with the user, then call loop_advance with evidence:'user-approved'.",
+    "IMPLEMENT": "Write implementation progress into progress.md first (loop_record progress).",
+    "VERIFY": "No passing evidence. Record the verify command + output into progress, and state 'passed: <cmd>' in evidence (negations like fail are rejected). To go back, use loop_advance VERIFY->IMPLEMENT."
+  },
+  "tools": {
+    "loop_start": "Start a new development loop (or resume a same-named task). Initializes .agent-loop/<task>/ and state, returns the current phase's playbook. Call once at the start of each requirement/task.",
+    "loop_status": "Return the current loop's phase, budget usage, artifact list and next action. Read-only, callable anytime.",
+    "loop_record": "Write working memory to disk artifacts (context-map / plan / progress) instead of piling it into the conversation — the core token saver. Appends by default.",
+    "loop_budget": "Report one tool's usage (for the INVESTIGATE exploration budget). E.g. loop_budget read 3. Over-budget warns in status/advance.",
+    "loop_advance": "Request entering a target phase. The engine checks the gate (e.g. an unapproved plan can't enter IMPLEMENT); on pass it serves the next phase's playbook just-in-time. Backward moves (e.g. VERIFY->IMPLEMENT) are always allowed.",
+    "loop_resume": "Resume the active loop: load state from .active and inline the approved plan + context-map together with the current phase playbook — used to continue in a clean context after /clear or a subagent. Read-only; does not advance. No args."
+  },
+  "ui": {
+    "start.new": "▶ New loop.",
+    "start.resumed": "↻ Resumed existing loop (current phase {phase} {title}).",
+    "start.task": "Task: {task}",
+    "start.source": "Source: {source}",
+    "start.stack": "Stack: {stack}",
+    "start.intakeHint": "Intake hint: {intake}",
+    "start.verify": "Verify command: `{verify}`",
+    "start.toolsLine": "— Tools: loop_status (state) · loop_record (write artifacts) · loop_budget (report usage) · loop_advance (next phase).",
+    "status.title": "# Agent Loop · {task}",
+    "status.phase": "Phase: **{phase} {title}** — {reminder}",
+    "status.dir": "Artifacts dir: .agent-loop/{slug}/",
+    "status.artifactsLabel": "Artifacts:",
+    "status.budgetsLabel": "Budget (usage, active during INVESTIGATE):",
+    "status.profile": "profile: {profile}",
+    "status.verifySuffix": " · verify: `{verify}`",
+    "status.next": "Next: after this phase `loop_advance {next}`.",
+    "status.lastPhase": "Already at the last phase.",
+    "artifact.line": "  - {key} ({file}): {status}",
+    "artifact.chars": "{n} chars",
+    "artifact.empty": "empty",
+    "budget.line": "  - {tool}: {used}/{limit}{flag}",
+    "budget.flag.over": " ❗over",
+    "budget.flag.near": " ⚠️near",
+    "budget.record": "Recorded {tool}={used}/{limit}.",
+    "budget.noLimit": "Recorded {tool}={used} (no budget ceiling for this tool).",
+    "budget.over": "Recorded {tool}={used}/{limit} — over budget; stop scattering reads, write findings into context-map then loop_advance PLAN.",
+    "budget.near": "Recorded {tool}={used}/{limit} ⚠️ budget nearly full, wrap up.",
+    "advance.ok": "✓ {from} → {to} {title}.",
+    "advance.fail": "cannot move from {from} to {to}: {reason}",
+    "advance.verifyNote": "\nVerify command for this project: `{verify}`",
+    "record.ok": "✓ wrote {file} (now {chars} chars).",
+    "resume.header": "↻ Resume loop: {task} (current phase {phase} {title})",
+    "resume.artifactEmpty": "(empty)",
+    "noActive": "No active loop. Call loop_start first.",
+    "noActiveResume": "No resumable loop (projectRoot={root}, .active does not point to a valid state). Call loop_start first."
+  }
+}

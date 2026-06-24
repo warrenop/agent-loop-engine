@@ -1,0 +1,97 @@
+{
+  "lang": "zh-CN",
+  "phases": {
+    "INTAKE": {
+      "title": "录入需求",
+      "reminder": "只录入需求,不写代码。把需求摘要写进 context-map.md。",
+      "playbook": "## 阶段 0 · INTAKE 录入需求\n目标:把「要做什么」固化成一段需求摘要,**先不碰代码**。\n\n1. 若提供了原型/PRD 链接(如 example.com):用浏览器 MCP **只抓一次**;若项目自带 PRD 提取技能则直接复用,别重写解析。\n2. 把需求摘要(目标 / 涉及端 / 验收点 / 明显约束)用 `loop_record context-map` 写入。\n3. 写完调用 `loop_advance CLARIFY`。\n\n护栏:抓取≤2 次;不要展开探索代码;摘要写盘而非堆在对话里。"
+    },
+    "CLARIFY": {
+      "title": "澄清提问",
+      "reminder": "把所有疑问合并成一次提问,答案记进 context-map.md。",
+      "playbook": "## 阶段 1 · CLARIFY 澄清提问\n目标:消除歧义后再动手。\n\n1. 列出会改变实现的疑问(范围 / 边界 / 多处是否都改 / 取舍),**一次性合并成一个提问**抛给用户,别逐条来回。\n2. 拿到答复后,用 `loop_record context-map`(append)追加「## 澄清结论」。\n3. 调 `loop_advance CLARIFY->INVESTIGATE`,在 evidence 里写明结论(或 `no-questions`)。\n\n护栏:无澄清结论或 evidence 为空 → 不允许进入调研。"
+    },
+    "INVESTIGATE": {
+      "title": "调研代码",
+      "reminder": "先定位后精读;已映射文件禁止重读;发现写进 context-map.md。",
+      "playbook": "## 阶段 2 · INVESTIGATE 调研代码(最省 token 的关键阶段)\n目标:用最少的探索把所有改动点摸清,并**落盘到 context-map.md**。\n\n纪律(G1–G3):\n- 先用 Grep/Glob/语义搜索**定位**,再按**行范围**精读,不要整文件读。\n- 同一文件**只读一次**:读完立刻把关键签名/调用链/行号写进 context-map;之后查 context-map,不重读。\n- 相关搜索**合并**,独立调用在同一回合**并行**发起。\n- 用量计数:装了预算 hook 的客户端会**自动计数**(Claude Code 连搜索都自动,Cursor 仅文件读取);**没装或客户端数不到的搜索**(如 Cursor 原生 grep)再手动 `loop_budget grep 1` 补报。\n\ncontext-map 至少包含:涉及文件 `path:line`、关键函数签名、调用链、**可复用的现有工具/方法**、一个「改动点覆盖清单」。\n\n完成后 `loop_advance INVESTIGATE->PLAN`。预算用尽会预警(80%)并提示收尾——这是叫你停止散读,而非继续。"
+    },
+    "PLAN": {
+      "title": "出计划",
+      "reminder": "写 plan.md;经用户批准(evidence:'user-approved')才能进入实现。",
+      "playbook": "## 阶段 3 · PLAN 出计划\n目标:产出一份可执行、可扫读的 plan.md,并取得用户批准。\n\n1. `loop_record plan` 写入:背景 / 方案 / **改动清单(每个文件改什么+为什么)** / 验证步骤。\n2. 优先**复用** context-map 里记到的现有工具/方法,引用其路径;改动保持外科手术式、最小化。\n3. 把计划给用户确认。获批后 `loop_advance PLAN->IMPLEMENT` 且 `evidence: 'user-approved'`。\n\n护栏:plan.md 未写或未获批 → 不允许进入实现。"
+    },
+    "IMPLEMENT": {
+      "title": "实现",
+      "reminder": "改动小/无→本会话做完;有实质改动→干净上下文续跑(/clear 后 /loop 无参,或 CC 派 subagent);精准编辑;每步更新 progress.md。",
+      "playbook": "## 阶段 4 · IMPLEMENT 实现\n目标:按 plan.md 落地,且**不让上下文爆掉**。\n\n✅ 状态已存盘。**先看 plan 的改动清单**:\n- **为空 / 极小(无实质代码改动,如功能已存在)**:直接在**本会话**完成 IMPLEMENT→VERIFY,不必 /clear 或派 subagent。\n- **有实质多步改动**:在**干净上下文**里续跑(不带 INVESTIGATE 长对话)——\n  - 通用:`/clear` 后运行 `/loop`(无参)→ 引擎 `loop_resume` 一次性内联 plan + context-map 续跑。\n  - Claude Code 也可由主会话直接派 subagent 接管(无需 /clear)。\n  - 无 slash 命令的客户端:在新的对话里直接调 `loop_resume`。\n\n纪律:\n- 用**精准 StrReplace**,不要整文件 Write(整文件会把全文塞进上下文且永久驻留)。\n- 一次一个逻辑改动;每完成一步用 `loop_record progress`(append)勾掉。\n- 只改计划内的东西,产生的孤儿 import/变量随手清掉,别顺手重构无关代码。\n\n全部完成后 `loop_advance IMPLEMENT->VERIFY`。"
+    },
+    "VERIFY": {
+      "title": "验证",
+      "reminder": "跑验证命令,把命令与输出记进 progress.md;失败回到实现。",
+      "playbook": "## 阶段 5 · VERIFY 验证\n目标:用证据证明改动有效。\n\n1. **范围自查**:核对实际改动文件(`git diff --stat`)是否都落在 plan.md 的改动清单内;多出来的要么说明、要么回退。\n2. 跑验证命令(见 profile 的 verify)。改动涉及**多端 / 共用逻辑**时,受影响各端都要验到,别只编译单模块。\n3. 把**命令 + 关键输出**用 `loop_record progress`(append)记下。\n4. 通过 → `loop_advance VERIFY->DONE`(evidence 写 `passed: <命令>`;含 fail/未通过等否定词会被拒)。失败 → `loop_advance VERIFY->IMPLEMENT` 回去修。\n\n护栏:无通过证据不允许进入 DONE;evidence 含否定词会被拒。"
+    },
+    "DONE": {
+      "title": "完成",
+      "reminder": "循环已完成。",
+      "playbook": "## ✅ DONE 完成\n本次 loop 结束。`.agent-loop/<task>/` 留有 context-map / plan / progress 作为可追溯产物。\n如需收尾(合并分支 / 提 PR),按你平时的流程继续。"
+    }
+  },
+  "gates": {
+    "done-terminal": "loop 已完成(DONE)。如需返工请用 loop_start 开新任务。",
+    "already-in": "已经在 {from} 阶段。",
+    "no-skip": "不允许跳过阶段:当前 {from},只能进入下一个阶段 {next}。",
+    "INTAKE": "请先用 loop_record context-map 写入需求摘要(≥40 字)。",
+    "CLARIFY": "请在 evidence 里写明澄清结论(≥12 字,或含 'no-questions'),或先把澄清结论记入 context-map。",
+    "INVESTIGATE": "context-map 调研发现过少(需 ≥200 字),请补齐涉及文件/签名/调用链/可复用项与覆盖清单。",
+    "plan-missing": "请先用 loop_record plan 写入计划。",
+    "plan-unapproved": "plan.md 已就绪。请向用户确认后,带 evidence:'user-approved' 再调用 loop_advance。",
+    "IMPLEMENT": "请先把实现进度写入 progress.md(loop_record progress)。",
+    "VERIFY": "无验证通过证据。请先把验证命令与输出记入 progress,并在 evidence 写明 'passed: <命令>'(含否定词如 fail/未通过会被拒)。失败请改用 loop_advance VERIFY->IMPLEMENT。"
+  },
+  "tools": {
+    "loop_start": "开始一个新的开发循环(或恢复同名任务)。初始化 .agent-loop/<task>/ 与状态,返回当前阶段的 playbook。每个需求/任务开始时调用一次。",
+    "loop_status": "返回当前 loop 的阶段、预算用量、产物清单与下一步动作。只读,随时可调。",
+    "loop_record": "把工作记忆写入磁盘产物(context-map / plan / progress),而不是堆在对话里——这是省 token 的核心。默认追加。",
+    "loop_budget": "上报一次工具用量(用于 INVESTIGATE 阶段的探索预算)。如 loop_budget read 3。超预算会在 status/advance 中预警。",
+    "loop_advance": "申请进入目标阶段。引擎校验闸门(如未获批的 plan 不能进 IMPLEMENT),通过则即时下发下一阶段的 playbook。向后回退(如 VERIFY->IMPLEMENT)总是允许。",
+    "loop_resume": "恢复活动 loop:从 .active 载入状态,把已批准的 plan + context-map 正文连同当前阶段 playbook 一次性内联返回——用于 /clear 或 subagent 后在干净上下文续跑。只读,不推进阶段。无参。"
+  },
+  "ui": {
+    "start.new": "▶ 新建 loop。",
+    "start.resumed": "↻ 恢复已存在的 loop(当前阶段 {phase} {title})。",
+    "start.task": "任务:{task}",
+    "start.source": "来源:{source}",
+    "start.stack": "技术栈:{stack}",
+    "start.intakeHint": "录入提示:{intake}",
+    "start.verify": "验证命令:`{verify}`",
+    "start.toolsLine": "—— 工具:loop_status 看状态 · loop_record 写产物 · loop_budget 报用量 · loop_advance 进阶段。",
+    "status.title": "# Agent Loop · {task}",
+    "status.phase": "阶段:**{phase} {title}** — {reminder}",
+    "status.dir": "产物目录:.agent-loop/{slug}/",
+    "status.artifactsLabel": "产物:",
+    "status.budgetsLabel": "预算(用量,INVESTIGATE 阶段生效):",
+    "status.profile": "profile:{profile}",
+    "status.verifySuffix": " · verify: `{verify}`",
+    "status.next": "下一步:完成本阶段后 `loop_advance {next}`。",
+    "status.lastPhase": "已在末阶段。",
+    "artifact.line": "  - {key} ({file}): {status}",
+    "artifact.chars": "{n} 字",
+    "artifact.empty": "空",
+    "budget.line": "  - {tool}: {used}/{limit}{flag}",
+    "budget.flag.over": " ❗超限",
+    "budget.flag.near": " ⚠️将满",
+    "budget.record": "记录 {tool}={used}/{limit}。",
+    "budget.noLimit": "记录 {tool}={used}(该工具无预算上限)。",
+    "budget.over": "记录 {tool}={used}/{limit} 已超预算——停止散读,把已有发现写进 context-map 后尽快 loop_advance PLAN。",
+    "budget.near": "记录 {tool}={used}/{limit} ⚠️ 预算将满,准备收尾。",
+    "advance.ok": "✓ {from} → {to} {title}。",
+    "advance.fail": "不能从 {from} 进入 {to}:{reason}",
+    "advance.verifyNote": "\n本项目验证命令:`{verify}`",
+    "record.ok": "✓ 已写入 {file}(当前 {chars} 字)。",
+    "resume.header": "↻ 恢复 loop:{task}(当前阶段 {phase} {title})",
+    "resume.artifactEmpty": "(空)",
+    "noActive": "当前没有活动的 loop。先调用 loop_start。",
+    "noActiveResume": "当前没有可恢复的 loop(projectRoot={root},.active 未指向有效状态)。先调用 loop_start 开始。"
+  }
+}
