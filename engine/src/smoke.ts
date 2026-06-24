@@ -6,7 +6,7 @@
 import { promises as fs } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { checkTransition, PHASES } from "./phases.js";
+import { checkTransition } from "./phases.js";
 import {
   initLoop,
   loadState,
@@ -20,6 +20,7 @@ import {
 } from "./state.js";
 import { DEFAULT_BUDGETS } from "./profile.js";
 import { buildResumeText } from "./resume.js";
+import { loadCatalog } from "./catalog.js";
 import {
   parseArgs,
   mergeMcpServers,
@@ -44,6 +45,7 @@ function check(label: string, cond: boolean) {
 // move state into a fresh temp root
 const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "agent-loop-smoke-"));
 process.env.AGENT_LOOP_ROOT = tmp;
+process.env.AGENT_LOOP_LANG = "zh-CN"; // 现有断言基于中文文案;用 zh-CN 包跑 = 证明"中文包==旧原文"
 
 async function advance(state: LoopState, to: Phase, evidence?: string): Promise<boolean> {
   const g = checkTransition(state, to, evidence);
@@ -182,10 +184,11 @@ const resumeEmptyPlan = await buildResumeText({
 } as LoopState);
 check("buildResume:阶段达标但 plan 未写入→标注(空)", resumeEmptyPlan.includes("## plan.md\n(空)"));
 
-// ===== IMPLEMENT 文案:去「新开 session」,指向 resume =====
-check("IMPLEMENT playbook 已去除「新开 session」", !PHASES.IMPLEMENT.playbook.includes("新开"));
-check("IMPLEMENT playbook 指向 loop_resume 续跑", PHASES.IMPLEMENT.playbook.includes("loop_resume"));
-check("IMPLEMENT reminder 已去除「新开 session」", !PHASES.IMPLEMENT.reminder.includes("新开"));
+// ===== IMPLEMENT 文案(zh-CN catalog):去「新开 session」,指向 resume =====
+const zhCat = await loadCatalog("zh-CN");
+check("IMPLEMENT playbook 已去除「新开 session」", !zhCat.phases.IMPLEMENT.playbook.includes("新开"));
+check("IMPLEMENT playbook 指向 loop_resume 续跑", zhCat.phases.IMPLEMENT.playbook.includes("loop_resume"));
+check("IMPLEMENT reminder 已去除「新开 session」", !zhCat.phases.IMPLEMENT.reminder.includes("新开"));
 
 // ===== init CLI 纯函数 =====
 const pa = parseArgs(["cursor", "--project", "/x", "--profile", "p"]);
